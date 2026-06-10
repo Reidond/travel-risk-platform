@@ -18,6 +18,11 @@
 
 ### Auto-Loaded by Claude (background knowledge)
 - prompt-engineering-conventions (reference) — Prompt authoring conventions (role design, few-shot, anchoring, safety nets)
+- python-best-practices (reference) — Expert Python conventions for the 3.12+ era (typing, data modeling, async, pytest, ruff)
+- uv-python-tooling (reference) — Mandatory uv usage for all Python tooling (no pip/poetry/pyenv/pipx; uv run, uv add, lockfile discipline)
+- react-best-practices (reference) — React 19+ practices (Compiler, Actions, Server Components, effects discipline, state/data-fetching ladders)
+- typescript-best-practices (reference) — TypeScript conventions for the TS 6/7 era (strictness config, type design, boundary validation, typed linting)
+- web-dev-best-practices (reference) — Framework-agnostic web practices (accessibility, modern CSS, Core Web Vitals, security, API design)
 
 ### Internal Pipeline Skills (invoked by workflows, not directly)
 - plan-critic (review) — Self-review spec documents before presenting
