@@ -72,6 +72,20 @@ Accumulated project-level knowledge discovered during task implementation, bug f
 - **Impact**: When adding compiler options newer than ~2 years, either verify the user's editor supports them or prefer the compatible equivalent; keep `.vscode/settings.json` pointing at the workspace toolchain.
 - **Category**: convention
 
+### [2026-06-11] GitHub reusable workflows run in the caller's context — concurrency, events, and artifacts
+- **Context**: Building ci.yml (`on: [pull_request, merge_group, workflow_call]`) reused as the pre-deploy gate by deploy.yml.
+- **Finding**: Inside a called workflow, `github.workflow` and `github.event_name` are the CALLER's (so a concurrency group keyed on `github.workflow` collides with the caller's); artifacts uploaded by called-workflow jobs ARE downloadable by sibling caller jobs (same run) — that's how deploy ships the exact bundle CI tested. Separately, a bare `workflow_dispatch` lets an operator deploy any branch — the deploy job needs `if: github.ref == 'refs/heads/main'`.
+- **Impact**: Key reusable-workflow concurrency on `github.event_name`+`github.ref`, never `github.workflow`; make cancel-in-progress a `== 'pull_request'` expression; guard production jobs by ref; rely on same-run artifact handoff instead of rebuilding.
+- **Category**: pitfall
+
+## External Service Quirks
+
+### [2026-06-11] Cloudflare Containers: wrangler builds the image, paths are config-relative, disk is ephemeral
+- **Context**: Deploying the FastAPI backend as a Cloudflare Container behind a Worker that serves frontend/dist as static assets (cloudflare/).
+- **Finding**: `wrangler deploy` builds + pushes the Docker image itself (forces linux/amd64; Docker required — present on ubuntu-latest); `--dry-run --containers-rollout none` validates the full config with no Docker/auth (the CI job). `image`/`image_build_context` resolve relative to the wrangler config file, and only the build-context-root `.dockerignore` applies (Dockerfile is piped via stdin). Container disk is ephemeral: SQLite resets on sleep (`sleepAfter`), every redeploy, and host maintenance — hence `max_instances: 1` + singleton `getContainer()` routing, and paths-ignore on docs-only pushes. First deploy provisions asynchronously: /api returns 503 for minutes while the workflow is already green — the smoke-test step retries /api/health to verify and warm it. Requires Workers Paid plan and an API token with Containers:Edit (Workers Scripts:Edit alone is not enough).
+- **Impact**: Validate wrangler config in CI with the dry-run flag combo; never trust a green deploy without the smoke test; treat demo data as disposable (or move storage to D1/DO before it matters); keep the root .dockerignore in sync with what backend/Dockerfile COPYs.
+- **Category**: external-api
+
 ## Pattern Discoveries
 
 ### [2026-06-11] Implement → adversarial-verify → fix workflow catches what builders miss
@@ -120,4 +134,10 @@ Accumulated project-level knowledge discovered during task implementation, bug f
 - **Context**: 4 parallel agents converting disjoint page files, all needing new uk/en strings (toasts, confirms, empty states).
 - **Finding**: Adding every anticipated key to both locale files up front and forbidding agents from touching `src/i18n/*` eliminated the only shared-file conflict; agents report missing keys in structured output instead. A flatten-and-diff node one-liner verifies parity (CI-able). Unused provisioned keys (one of ~30) are cheap to delete afterwards.
 - **Impact**: For any parallel frontend fan-out: centralize shared-file edits (i18n, index.css, ui/) in the orchestrator before launching; give agents disjoint file ownership lists.
+- **Category**: pattern
+
+### [2026-06-11] Per-tool parallel CI jobs with locked tool versions resolve monorepo configs correctly
+- **Context**: ci.yml runs ruff, pytest×2, eslint, tsc+vite, i18n parity, and wrangler validation as separate parallel jobs.
+- **Finding**: A single `uv run --project core ruff check core backend` lints both Python packages at the lockfile-pinned ruff while each file resolves its nearest `[tool.ruff]` (backend keeps its RUF001-003 ignores) — no per-package jobs or uvx-latest drift needed. `uvx --from actionlint-py actionlint` and `uvx zizmor` lint the workflows themselves locally before the first push; zizmor drove real hardening (SHA-pinned actions + dependabot cooldown, `persist-credentials: false`, env-var indirection for template expansion).
+- **Impact**: In CI, invoke Python tools via `uv run --project <member>` (locked version), not uvx; lint workflow YAML with actionlint+zizmor before pushing; SHA-pin actions and let Dependabot (weekly, 7-day cooldown) bump them.
 - **Category**: pattern

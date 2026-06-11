@@ -17,6 +17,14 @@
 
 ## 2026-06-11
 
+### [CONV-MODIFIED] CI/CD convention added; Deployment and i18n conventions updated for GitHub Actions + Cloudflare
+- **Category:** Quality
+- **Hypothesis:** By running every quality gate as a parallel CI job on each PR and re-running the full gate before every Cloudflare deploy, we expect regressions (broken control-value tests, lint drift, i18n key divergence, invalid wrangler config) to be caught before merge instead of during manual review or after deploy, because the gates that previously required someone to remember to run them locally are now machine-enforced on both paths to production.
+- **Signal:** CI catches a real failure on a PR (red check on pytest/ruff/eslint/i18n/wrangler) that would otherwise have landed on main; zero post-deploy "demo is broken" discoveries that a gate could have caught; no recurrence of i18n key-set divergence.
+- **Risk:** Docs-only pushes skip deploy via paths-ignore — an overly broad ignore pattern could silently skip a needed deploy; ephemeral demo SQLite may be mistaken for a bug despite documentation.
+- **Status:** PENDING
+- **Changelog ref:** 2026-06-11 — CONV-MODIFIED: CI/CD convention added; Deployment and i18n conventions updated for GitHub Actions + Cloudflare
+
 ### [RULE-ADDED] Two "Do not" rules from the shadcn/ui migration
 - **Category:** Quality
 - **Hypothesis:** By naming the two invisible couplings the migration actually hit (screenshot script ↔ PanelPage flow; locale files ↔ parallel subagent fan-outs), we expect future UI changes and multi-agent workflows to avoid silent thesis-figure breakage and i18n merge conflicts because both failure modes now have an explicit pre-flight check in the binding rules instead of living only in transcripts.

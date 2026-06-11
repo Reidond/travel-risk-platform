@@ -12,6 +12,12 @@
 
 ## 2026-06-11
 
+### CONV-MODIFIED: CI/CD convention added; Deployment and i18n conventions updated for GitHub Actions + Cloudflare
+- **What:** Added a **CI/CD** bullet to AGENTS.md Conventions (ci.yml runs every gate as its own parallel job — ruff, pytest×2, eslint, tsc+vite build, i18n parity, wrangler validate — on PRs; deploy.yml re-runs CI then deploys to Cloudflare on pushes to main; SHA-pinned actions with weekly Dependabot). Updated **Deployment** to document the Cloudflare path (Worker = SPA static assets + `/api/*` → backend container, ephemeral SQLite, see cloudflare/README.md) alongside docker compose, and **i18n** to note key parity is now CI-enforced by `scripts/check_i18n_keys.mjs`
+- **Why:** The platform gained a CI/CD pipeline and a second (primary, public-demo) deployment target this session; conventions must point future tasks at the CI gates they will be checked against and at the ephemeral-storage caveat before anyone relies on demo data persisting
+- **Files:** `AGENTS.md`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.github/dependabot.yml`, `cloudflare/` (wrangler.jsonc, src/worker.ts, package.json, tsconfig.json, README.md), `scripts/check_i18n_keys.mjs`, `.dockerignore`, `frontend/public/_headers`, `README.md`, `docs/thesis-5.3-5.4-draft.md`, `.ai/learnings.md`
+- **Affected workflows:** post-task-review (CI gates now exist to check against); any task touching i18n files (parity is CI-enforced); deployment-related tasks
+
 ### RULE-ADDED: Two "Do not" rules from the shadcn/ui migration
 - **What:** Added to AGENTS.md "Do not": (1) never change PanelPage's evaluation flow, `step-card` markup, or run-button labels without updating `scripts/make_screenshots.py` in the same change (the script clicks "Run all", confirms the AlertDialog, and waits for `.step-card`); (2) never edit `frontend/src/i18n/*.json` from parallel subagents — pre-provision keys in the orchestrator and keep agent file ownership disjoint
 - **Why:** The migration empirically hit both: putting Run-all behind a ConfirmDialog silently broke thesis-figure regeneration until the script was patched, and the parallel 4-track page conversion only avoided locale-file conflicts because keys were provisioned up front
