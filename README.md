@@ -80,7 +80,9 @@ the `web` service, and mount a persistent volume at `/app/data` on the API
 container so the SQLite database survives restarts (compose already declares
 the `api-data` volume for this).
 
-Public demo: _URL to be added once deployed._
+Public demo: **<https://travel-risk-platform.andrii-shafar.workers.dev>**
+(data is ephemeral — the demo database resets on idle/redeploy; reload it via
+"Load demo dataset").
 
 ## Tests & quality gates
 
