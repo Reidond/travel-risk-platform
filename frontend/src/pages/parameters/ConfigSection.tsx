@@ -1,12 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { configApi } from '../../api/config'
 import { RISK_TERMS, type ConfigParams, type ConfigVersion, type RiskTerm } from '../../api/types'
 import { ErrorNote, Loading } from '../../components/Feedback'
 import { formatDateTime } from '../../lib/format'
 import { useLang } from '../../lib/lang'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export function ConfigSection() {
   const { t } = useTranslation()
@@ -14,19 +28,24 @@ export function ConfigSection() {
   const versionsQuery = useQuery({ queryKey: ['configVersions'], queryFn: configApi.versions })
 
   return (
-    <section className="panel-card" aria-labelledby="config-title">
-      <h2 id="config-title">{t('parameters.config.title')}</h2>
+    <section
+      className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+      aria-labelledby="config-title"
+    >
+      <h2 id="config-title" className="text-lg font-semibold mb-3">
+        {t('parameters.config.title')}
+      </h2>
       {configQuery.isPending && <Loading />}
       {configQuery.isError && <ErrorNote error={configQuery.error} />}
       {configQuery.isSuccess && (
         <>
-          <p className="muted">
+          <p className="text-muted-foreground text-sm mb-4">
             {t('parameters.config.activeVersion', { version: configQuery.data.version })}
           </p>
           <ConfigForm key={configQuery.data.version} active={configQuery.data} />
         </>
       )}
-      <h3>{t('parameters.config.history')}</h3>
+      <h3 className="mt-6 mb-3 text-base font-semibold">{t('parameters.config.history')}</h3>
       {versionsQuery.isPending && <Loading />}
       {versionsQuery.isError && <ErrorNote error={versionsQuery.error} />}
       {versionsQuery.isSuccess && <VersionHistory versions={versionsQuery.data.items} />}
@@ -61,13 +80,12 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
   const [thresholds, setThresholds] = useState<string[]>(toStrings(params.risk_thresholds))
   const [comment, setComment] = useState('')
   const [formErrors, setFormErrors] = useState<string[]>([])
-  const [savedVersion, setSavedVersion] = useState<number | null>(null)
 
   const mutation = useMutation({
     mutationFn: (body: { params: ConfigParams; comment: string | null }) =>
       configApi.create(body),
     onSuccess: (data) => {
-      setSavedVersion(data.version)
+      toast.success(t('parameters.config.saved', { version: data.version }))
       void queryClient.invalidateQueries({ queryKey: ['config'] })
       void queryClient.invalidateQueries({ queryKey: ['configVersions'] })
       void queryClient.invalidateQueries({ queryKey: ['curves'] })
@@ -120,7 +138,6 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
     setFormErrors(errors)
     if (errors.length > 0) return
 
-    setSavedVersion(null)
     mutation.mutate({
       params: {
         term_multipliers: multiplierValues,
@@ -144,15 +161,17 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
 
   return (
     <form onSubmit={submit} noValidate>
-      <fieldset className="config-group">
-        <legend>{t('parameters.config.termMultipliers')}</legend>
-        <div className="form-row">
+      <fieldset className="rounded-lg border px-4 py-3 mb-4">
+        <legend className="px-1.5 text-sm font-semibold">
+          {t('parameters.config.termMultipliers')}
+        </legend>
+        <div className="flex flex-wrap gap-4">
           {multipliers.map((value, index) => {
             const id = `multiplier-${index}`
             return (
-              <div key={id} className="form-field">
-                <label htmlFor={id}>{t('parameters.config.multiplier', { index: index + 1 })}</label>
-                <input
+              <div key={id} className="grid gap-1.5 w-28">
+                <Label htmlFor={id}>{t('parameters.config.multiplier', { index: index + 1 })}</Label>
+                <Input
                   id={id}
                   type="number"
                   step="any"
@@ -165,17 +184,17 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
         </div>
       </fieldset>
 
-      <fieldset className="config-group">
-        <legend>{t('parameters.config.chiScale')}</legend>
-        <div className="form-row">
+      <fieldset className="rounded-lg border px-4 py-3 mb-4">
+        <legend className="px-1.5 text-sm font-semibold">{t('parameters.config.chiScale')}</legend>
+        <div className="flex flex-wrap gap-4">
           {RISK_TERMS.map((term) => {
             const id = `chi-${term}`
             return (
-              <div key={term} className="form-field">
-                <label htmlFor={id}>
+              <div key={term} className="grid gap-1.5 w-28">
+                <Label htmlFor={id}>
                   {t('parameters.config.chiFor', { term: `${term} (${t(`terms.${term}`)})` })}
-                </label>
-                <input
+                </Label>
+                <Input
                   id={id}
                   type="number"
                   step="any"
@@ -188,26 +207,26 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
         </div>
       </fieldset>
 
-      <fieldset className="config-group">
-        <legend>{t('parameters.config.zSpline')}</legend>
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="z-a">{t('parameters.config.zA')}</label>
-            <input id="z-a" type="number" step="any" value={zA} onChange={(e) => setZA(e.target.value)} />
+      <fieldset className="rounded-lg border px-4 py-3 mb-4">
+        <legend className="px-1.5 text-sm font-semibold">{t('parameters.config.zSpline')}</legend>
+        <div className="flex flex-wrap gap-4">
+          <div className="grid gap-1.5 w-28">
+            <Label htmlFor="z-a">{t('parameters.config.zA')}</Label>
+            <Input id="z-a" type="number" step="any" value={zA} onChange={(e) => setZA(e.target.value)} />
           </div>
-          <div className="form-field">
-            <label htmlFor="z-b">{t('parameters.config.zB')}</label>
-            <input id="z-b" type="number" step="any" value={zB} onChange={(e) => setZB(e.target.value)} />
+          <div className="grid gap-1.5 w-28">
+            <Label htmlFor="z-b">{t('parameters.config.zB')}</Label>
+            <Input id="z-b" type="number" step="any" value={zB} onChange={(e) => setZB(e.target.value)} />
           </div>
         </div>
       </fieldset>
 
-      <fieldset className="config-group">
-        <legend>{t('parameters.config.cone')}</legend>
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="cone-base-x">{t('parameters.config.coneBaseX')}</label>
-            <input
+      <fieldset className="rounded-lg border px-4 py-3 mb-4">
+        <legend className="px-1.5 text-sm font-semibold">{t('parameters.config.cone')}</legend>
+        <div className="flex flex-wrap gap-4">
+          <div className="grid gap-1.5 w-28">
+            <Label htmlFor="cone-base-x">{t('parameters.config.coneBaseX')}</Label>
+            <Input
               id="cone-base-x"
               type="number"
               step="any"
@@ -215,9 +234,9 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
               onChange={(e) => updateAt(setConeBase, 0)(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="cone-base-y">{t('parameters.config.coneBaseY')}</label>
-            <input
+          <div className="grid gap-1.5 w-28">
+            <Label htmlFor="cone-base-y">{t('parameters.config.coneBaseY')}</Label>
+            <Input
               id="cone-base-y"
               type="number"
               step="any"
@@ -225,9 +244,9 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
               onChange={(e) => updateAt(setConeBase, 1)(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="cone-scale-x">{t('parameters.config.coneScaleX')}</label>
-            <input
+          <div className="grid gap-1.5 w-28">
+            <Label htmlFor="cone-scale-x">{t('parameters.config.coneScaleX')}</Label>
+            <Input
               id="cone-scale-x"
               type="number"
               step="any"
@@ -235,9 +254,9 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
               onChange={(e) => updateAt(setConeScale, 0)(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="cone-scale-y">{t('parameters.config.coneScaleY')}</label>
-            <input
+          <div className="grid gap-1.5 w-28">
+            <Label htmlFor="cone-scale-y">{t('parameters.config.coneScaleY')}</Label>
+            <Input
               id="cone-scale-y"
               type="number"
               step="any"
@@ -248,15 +267,15 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
         </div>
       </fieldset>
 
-      <fieldset className="config-group">
-        <legend>{t('parameters.config.boundaries')}</legend>
-        <div className="form-row">
+      <fieldset className="rounded-lg border px-4 py-3 mb-4">
+        <legend className="px-1.5 text-sm font-semibold">{t('parameters.config.boundaries')}</legend>
+        <div className="flex flex-wrap gap-4">
           {boundaries.map((value, index) => {
             const id = `boundary-${index}`
             return (
-              <div key={id} className="form-field">
-                <label htmlFor={id}>{t('parameters.config.boundary', { index: index + 1 })}</label>
-                <input
+              <div key={id} className="grid gap-1.5 w-28">
+                <Label htmlFor={id}>{t('parameters.config.boundary', { index: index + 1 })}</Label>
+                <Input
                   id={id}
                   type="number"
                   step="any"
@@ -269,15 +288,15 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
         </div>
       </fieldset>
 
-      <fieldset className="config-group">
-        <legend>{t('parameters.config.thresholds')}</legend>
-        <div className="form-row">
+      <fieldset className="rounded-lg border px-4 py-3 mb-4">
+        <legend className="px-1.5 text-sm font-semibold">{t('parameters.config.thresholds')}</legend>
+        <div className="flex flex-wrap gap-4">
           {thresholds.map((value, index) => {
             const id = `threshold-${index}`
             return (
-              <div key={id} className="form-field">
-                <label htmlFor={id}>{t('parameters.config.threshold', { index: index + 1 })}</label>
-                <input
+              <div key={id} className="grid gap-1.5 w-28">
+                <Label htmlFor={id}>{t('parameters.config.threshold', { index: index + 1 })}</Label>
+                <Input
                   id={id}
                   type="number"
                   step="any"
@@ -292,9 +311,9 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
         </div>
       </fieldset>
 
-      <div className="form-field">
-        <label htmlFor="config-comment">{t('common.comment')}</label>
-        <input
+      <div className="grid gap-1.5">
+        <Label htmlFor="config-comment">{t('common.comment')}</Label>
+        <Input
           id="config-comment"
           type="text"
           value={comment}
@@ -303,23 +322,22 @@ function ConfigForm({ active }: { active: ConfigVersion }) {
       </div>
 
       {formErrors.length > 0 && (
-        <ul className="form-error" role="alert">
+        <ul role="alert" className="text-destructive text-sm list-disc pl-5 space-y-1 mt-3">
           {formErrors.map((error) => (
             <li key={error}>{error}</li>
           ))}
         </ul>
       )}
-      {mutation.isError && <ErrorNote error={mutation.error} />}
-      {savedVersion !== null && (
-        <p className="alert alert-success" role="status">
-          {t('parameters.config.saved', { version: savedVersion })}
-        </p>
+      {mutation.isError && (
+        <div className="mt-3">
+          <ErrorNote error={mutation.error} />
+        </div>
       )}
 
-      <div className="form-actions form-actions-start">
-        <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
+      <div className="mt-4 flex justify-start gap-2">
+        <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? t('common.saving') : t('parameters.config.saveAsNew')}
-        </button>
+        </Button>
       </div>
     </form>
   )
@@ -341,40 +359,44 @@ function VersionHistory({ versions }: { versions: ConfigVersion[] }) {
   return (
     <>
       {activateMutation.isError && <ErrorNote error={activateMutation.error} />}
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th scope="col">{t('common.version')}</th>
-              <th scope="col">{t('common.createdAt')}</th>
-              <th scope="col">{t('common.comment')}</th>
-              <th scope="col">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableCaption className="sr-only">{t('parameters.config.history')}</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col" className="text-right">
+                {t('common.version')}
+              </TableHead>
+              <TableHead scope="col">{t('common.createdAt')}</TableHead>
+              <TableHead scope="col">{t('common.comment')}</TableHead>
+              <TableHead scope="col">{t('common.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {versions.map((version) => (
-              <tr key={version.version}>
-                <td>{version.version}</td>
-                <td>{formatDateTime(version.created_at, lang)}</td>
-                <td>{version.comment ?? '—'}</td>
-                <td>
+              <TableRow key={version.version}>
+                <TableCell className="text-right tabular-nums">{version.version}</TableCell>
+                <TableCell>{formatDateTime(version.created_at, lang)}</TableCell>
+                <TableCell>{version.comment ?? '—'}</TableCell>
+                <TableCell>
                   {version.active ? (
-                    <span className="status-badge status-ok">{t('common.active')}</span>
+                    <Badge variant="success">{t('common.active')}</Badge>
                   ) : (
-                    <button
+                    <Button
                       type="button"
-                      className="btn btn-small"
+                      variant="outline"
+                      size="sm"
                       disabled={activateMutation.isPending}
                       onClick={() => activateMutation.mutate(version.version)}
                     >
                       {t('common.activate')}
-                    </button>
+                    </Button>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </>
   )

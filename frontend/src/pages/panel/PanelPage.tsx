@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircleIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
+import { toast } from 'sonner'
 
+import { errorDetailText } from '../../api/client'
 import { evaluationsApi } from '../../api/evaluations'
 import { REGIONS_MAX_LIMIT, regionsApi } from '../../api/regions'
 import {
@@ -14,15 +17,33 @@ import {
   type RegionResult,
 } from '../../api/types'
 import { RiskClassBadge, TermBadge } from '../../components/Badges'
-import { ErrorNote, Loading } from '../../components/Feedback'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorNote, LoadingSkeleton } from '../../components/Feedback'
 import { DELTA_SHORT, fmt } from '../../lib/format'
 import { useLang, localizedName } from '../../lib/lang'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function PanelPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(new Set())
   const [run, setRun] = useState<EvaluationRun | null>(null)
+  const [runAllOpen, setRunAllOpen] = useState(false)
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -36,8 +57,12 @@ export function PanelPage() {
       evaluationsApi.create({ region_ids: regionIds }),
     onSuccess: (data) => {
       setRun(data)
+      toast.success(t('toast.evaluated', { id: data.id }))
       void queryClient.invalidateQueries({ queryKey: ['regions'] })
       void queryClient.invalidateQueries({ queryKey: ['evaluations'] })
+    },
+    onSettled: () => {
+      setRunAllOpen(false)
     },
   })
 
@@ -53,95 +78,166 @@ export function PanelPage() {
     })
   }
 
-  return (
-    <div className="page">
-      <h1>{t('panel.title')}</h1>
-      <p className="muted">{t('panel.intro')}</p>
+  const allSelected =
+    regions.length > 0 && regions.every((region) => selectedIds.has(region.id))
+  const headerChecked: boolean | 'indeterminate' = allSelected
+    ? true
+    : selectedIds.size > 0
+      ? 'indeterminate'
+      : false
 
-      {regionsQuery.isPending && <Loading />}
+  const toggleAll = () => {
+    setSelectedIds(
+      allSelected ? new Set<number>() : new Set(regions.map((region) => region.id)),
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{t('panel.title')}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{t('panel.intro')}</p>
+      </div>
+
+      {regionsQuery.isPending && <LoadingSkeleton rows={6} />}
       {regionsQuery.isError && <ErrorNote error={regionsQuery.error} />}
       {regionsQuery.isSuccess && regions.length === 0 && (
-        <p className="muted">{t('panel.noRegions')}</p>
+        <EmptyState title={t('emptyStates.panelTitle')} hint={t('emptyStates.panelHint')}>
+          <Button asChild>
+            <Link to="/regions">{t('emptyStates.panelCta')}</Link>
+          </Button>
+        </EmptyState>
       )}
 
       {regions.length > 0 && (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col"></th>
-                <th scope="col">{t('dashboard.region')}</th>
-                <th scope="col">
-                  <abbr title={t('values.xi')}>Ξ</abbr>
-                </th>
-                <th scope="col">
-                  <abbr title={t('values.deltaLevel')}>Δ</abbr>
-                </th>
-                <th scope="col">
-                  <abbr title={t('values.n')}>n</abbr>
-                </th>
-                <th scope="col"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {regions.map((region) => (
-                <PanelRow
-                  key={region.id}
-                  region={region}
-                  checked={selectedIds.has(region.id)}
-                  onToggle={() => toggleRegion(region.id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableCaption className="sr-only">{t('panel.title')}</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">
+                    <Checkbox
+                      checked={headerChecked}
+                      onCheckedChange={toggleAll}
+                      aria-label={t('panel.selectAll')}
+                    />
+                  </TableHead>
+                  <TableHead scope="col">{t('dashboard.region')}</TableHead>
+                  <TableHead scope="col">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <abbr title={t('values.xi')}>Ξ</abbr>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('values.xi')}</TooltipContent>
+                    </Tooltip>
+                  </TableHead>
+                  <TableHead scope="col">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <abbr title={t('values.deltaLevel')}>Δ</abbr>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('values.deltaLevel')}</TooltipContent>
+                    </Tooltip>
+                  </TableHead>
+                  <TableHead scope="col" className="text-right">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <abbr title={t('values.n')}>n</abbr>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('values.n')}</TooltipContent>
+                    </Tooltip>
+                  </TableHead>
+                  <TableHead scope="col">
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {regions.map((region) => (
+                  <PanelRow
+                    key={region.id}
+                    region={region}
+                    checked={selectedIds.has(region.id)}
+                    onToggle={() => toggleRegion(region.id)}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="bg-card/95 sticky bottom-0 -mx-1 mt-2 flex flex-wrap items-center gap-3 rounded-lg border p-3 shadow-sm backdrop-blur">
+            <span className="text-muted-foreground text-sm" aria-live="polite">
+              {t('panel.selectedCount', { n: selectedIds.size })}
+            </span>
+            <Button
+              disabled={evalMutation.isPending || selectedIds.size === 0}
+              onClick={() => evalMutation.mutate([...selectedIds])}
+            >
+              {evalMutation.isPending
+                ? t('panel.running')
+                : t('panel.runSelected', { n: selectedIds.size })}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={evalMutation.isPending}
+              onClick={() => setRunAllOpen(true)}
+            >
+              {t('panel.runAll')}
+            </Button>
+          </div>
+        </>
       )}
 
-      {regions.length > 0 && (
-        <div className="form-actions form-actions-start">
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={evalMutation.isPending || selectedIds.size === 0}
-            onClick={() => evalMutation.mutate([...selectedIds])}
-          >
-            {evalMutation.isPending
-              ? t('panel.running')
-              : t('panel.runSelected', { n: selectedIds.size })}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={evalMutation.isPending}
-            onClick={() => evalMutation.mutate(null)}
-          >
-            {evalMutation.isPending ? t('panel.running') : t('panel.runAll')}
-          </button>
-        </div>
-      )}
+      <ConfirmDialog
+        open={runAllOpen}
+        onOpenChange={setRunAllOpen}
+        title={t('confirm.runAllTitle')}
+        description={t('confirm.runAllBody')}
+        confirmLabel={t('panel.runAll')}
+        pendingLabel={t('panel.running')}
+        onConfirm={() => evalMutation.mutate(null)}
+        isPending={evalMutation.isPending}
+      />
 
       {evalMutation.isError && (
-        <div className="alert alert-error" role="alert">
-          <strong>{t('panel.evalConflict')} </strong>
-          <ErrorNote error={evalMutation.error} />
-        </div>
+        <Alert variant="destructive" role="alert">
+          <AlertCircleIcon aria-hidden="true" />
+          <AlertTitle>{t('panel.evalConflict')}</AlertTitle>
+          <AlertDescription>
+            {errorDetailText(evalMutation.error) ?? t('errors.generic')}
+          </AlertDescription>
+        </Alert>
       )}
 
       {run && (
-        <section className="panel-card" aria-labelledby="run-results-title">
-          <div className="section-head">
-            <h2 id="run-results-title">{t('panel.results', { id: run.id })}</h2>
-            <Link className="btn" to="/dashboard">
-              {t('panel.toDashboard')}
-            </Link>
+        <section
+          aria-labelledby="run-results-title"
+          className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+            <h2 id="run-results-title" className="text-lg font-semibold">
+              {t('panel.results', { id: run.id })}
+            </h2>
+            <Button asChild variant="outline">
+              <Link to="/dashboard">{t('panel.toDashboard')}</Link>
+            </Button>
           </div>
-          {run.results.map((result) => (
-            <ResultCard key={result.region.id} result={result} />
-          ))}
-          <div className="alert alert-info callout">
-            <span>{t('panel.adjustCallout')}</span>{' '}
-            <Link to="/parameters">{t('panel.adjustLink')}</Link>
+          <div className="flex flex-col gap-4">
+            {run.results.map((result) => (
+              <ResultCard key={result.region.id} result={result} />
+            ))}
           </div>
+          <Alert variant="info" role="status" className="mt-4">
+            <AlertDescription>
+              <p>
+                {t('panel.adjustCallout')}{' '}
+                <Link to="/parameters?tab=rules" className="text-primary underline">
+                  {t('panel.adjustLink')}
+                </Link>
+              </p>
+            </AlertDescription>
+          </Alert>
         </section>
       )}
     </div>
@@ -169,6 +265,7 @@ function PanelRow({
     mutationFn: (body: { xi: number | null; delta_level: DeltaLevel | null }) =>
       regionsApi.update(region.id, body),
     onSuccess: () => {
+      toast.success(t('toast.panelRowSaved'))
       void queryClient.invalidateQueries({ queryKey: ['regions'] })
     },
   })
@@ -192,18 +289,17 @@ function PanelRow({
     region.xi != null && region.delta_level != null && region.respondent_count > 0
 
   return (
-    <tr>
-      <td>
-        <input
-          type="checkbox"
+    <TableRow>
+      <TableCell>
+        <Checkbox
           checked={checked}
-          onChange={onToggle}
+          onCheckedChange={onToggle}
           aria-label={t('panel.selectRegion', { name })}
         />
-      </td>
-      <th scope="row">{name}</th>
-      <td>
-        <input
+      </TableCell>
+      <TableHead scope="row">{name}</TableHead>
+      <TableCell>
+        <Input
           type="number"
           min={0}
           max={1}
@@ -211,14 +307,15 @@ function PanelRow({
           value={xi}
           onChange={(e) => setXi(e.target.value)}
           aria-label={t('panel.xiInput', { name })}
-          className="input-narrow"
+          className="w-24"
         />
-      </td>
-      <td>
+      </TableCell>
+      <TableCell>
         <select
           value={delta}
           onChange={(e) => setDelta(e.target.value as DeltaLevel | '')}
           aria-label={t('panel.deltaSelect', { name })}
+          className="border-input bg-background h-9 rounded-md border px-2.5 text-sm shadow-xs focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:border-ring outline-none"
         >
           <option value="">{t('common.notSet')}</option>
           {DELTA_LEVELS.map((level) => (
@@ -227,42 +324,47 @@ function PanelRow({
             </option>
           ))}
         </select>
-      </td>
-      <td>{region.respondent_count}</td>
-      <td>
-        <div className="row-actions">
-          <button
+      </TableCell>
+      <TableCell className="text-right tabular-nums">{region.respondent_count}</TableCell>
+      <TableCell className="whitespace-normal">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
             type="button"
-            className="btn btn-small"
+            variant="outline"
+            size="sm"
             onClick={save}
             disabled={saveMutation.isPending}
           >
             {saveMutation.isPending ? t('common.saving') : t('common.save')}
-          </button>
+          </Button>
           {ready ? (
-            <span className="status-badge status-ok">{t('panel.ready')}</span>
+            <Badge variant="success">{t('panel.ready')}</Badge>
           ) : (
             <>
               {region.xi == null && (
-                <span className="status-badge status-warn">{t('panel.missingXi')}</span>
+                <Badge variant="warning">{t('panel.missingXi')}</Badge>
               )}
               {region.delta_level == null && (
-                <span className="status-badge status-warn">{t('panel.missingDelta')}</span>
+                <Badge variant="warning">{t('panel.missingDelta')}</Badge>
               )}
               {region.respondent_count === 0 && (
-                <span className="status-badge status-warn">{t('panel.noRespondents')}</span>
+                <Badge variant="warning">{t('panel.noRespondents')}</Badge>
               )}
             </>
           )}
         </div>
         {rowError !== null && (
-          <p className="form-error" role="alert">
+          <p className="text-destructive mt-1.5 text-sm" role="alert">
             {rowError}
           </p>
         )}
-        {saveMutation.isError && <ErrorNote error={saveMutation.error} />}
-      </td>
-    </tr>
+        {saveMutation.isError && (
+          <div className="mt-2">
+            <ErrorNote error={saveMutation.error} />
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -270,44 +372,52 @@ function ResultCard({ result }: { result: RegionResult }) {
   const { t } = useTranslation()
   const lang = useLang()
   return (
-    <article className="result-card">
-      <h3>{localizedName(result.region, lang)}</h3>
-      <div className="steps">
-        <section className="step-card">
-          <h4>{t('panel.step1')}</h4>
-          <p className="muted">
+    <article className="rounded-lg border p-4">
+      <h3 className="mb-2 text-base font-semibold">
+        {localizedName(result.region, lang)}
+      </h3>
+      <div className="flex flex-wrap items-stretch gap-2.5 max-sm:flex-col">
+        <section className="step-card flex-1 basis-56 space-y-1.5 rounded-lg border bg-muted/50 px-4 py-3">
+          <h4 className="text-sm font-semibold">{t('panel.step1')}</h4>
+          <p className="text-muted-foreground text-sm">
             {t('values.n')}: {result.n}
           </p>
-          <ul className="distribution-list">
+          <ul className="list-none space-y-1.5">
             {RISK_TERMS.map((term) => (
-              <li key={term}>
-                <TermBadge term={term} compact />{' '}
+              <li key={term} className="flex items-center gap-2">
+                <TermBadge term={term} compact />
                 <span>{result.r_star_distribution[term] ?? 0}</span>
               </li>
             ))}
           </ul>
         </section>
-        <span className="step-arrow" aria-hidden="true">
+        <span
+          className="text-muted-foreground self-center text-2xl max-sm:ml-4 max-sm:rotate-90 max-sm:self-start"
+          aria-hidden="true"
+        >
           →
         </span>
-        <section className="step-card">
-          <h4>{t('panel.step2')}</h4>
-          <p>δ = {fmt(result.delta, 2)}</p>
-          <p>φ = {fmt(result.phi, 4)}</p>
-          <p>
+        <section className="step-card flex-1 basis-56 space-y-1.5 rounded-lg border bg-muted/50 px-4 py-3">
+          <h4 className="text-sm font-semibold">{t('panel.step2')}</h4>
+          <p className="text-sm">δ = {fmt(result.delta, 2)}</p>
+          <p className="text-sm">φ = {fmt(result.phi, 4)}</p>
+          <p className="text-sm">
             m_S = {fmt(result.m_s, 4)} (Ξ = {fmt(result.xi, 2)})
           </p>
         </section>
-        <span className="step-arrow" aria-hidden="true">
+        <span
+          className="text-muted-foreground self-center text-2xl max-sm:ml-4 max-sm:rotate-90 max-sm:self-start"
+          aria-hidden="true"
+        >
           →
         </span>
-        <section className="step-card">
-          <h4>{t('panel.step3')}</h4>
-          <p>
+        <section className="step-card flex-1 basis-56 space-y-1.5 rounded-lg border bg-muted/50 px-4 py-3">
+          <h4 className="text-sm font-semibold">{t('panel.step3')}</h4>
+          <p className="text-sm">
             ω = {fmt(result.omega, 2)} ({DELTA_SHORT[result.delta_level]})
           </p>
-          <p>μ_R = {fmt(result.mu, 4)}</p>
-          <p>
+          <p className="text-sm">μ_R = {fmt(result.mu, 4)}</p>
+          <p className="text-sm">
             <RiskClassBadge riskClass={result.risk_class} />
           </p>
         </section>

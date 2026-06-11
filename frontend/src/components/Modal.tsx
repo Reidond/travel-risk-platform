@@ -1,5 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 interface ModalProps {
   title: string
@@ -8,34 +10,16 @@ interface ModalProps {
   wide?: boolean
 }
 
-/** Accessible modal on top of the native <dialog> element. */
+/** Form modal on top of shadcn/Radix Dialog (focus trap, Esc, focus return). */
 export function Modal({ title, onClose, children, wide }: ModalProps) {
-  const { t } = useTranslation()
-  const ref = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    ref.current?.showModal()
-  }, [])
-
   return (
-    <dialog
-      ref={ref}
-      className={wide === true ? 'modal modal-wide' : 'modal'}
-      onClose={onClose}
-      aria-label={title}
-    >
-      <div className="modal-header">
-        <h2 className="modal-title">{title}</h2>
-        <button
-          type="button"
-          className="btn btn-icon"
-          onClick={onClose}
-          aria-label={t('common.close')}
-        >
-          ✕
-        </button>
-      </div>
-      <div className="modal-body">{children}</div>
-    </dialog>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className={cn(wide === true && 'sm:max-w-3xl')}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="-mx-2 max-h-[70vh] overflow-y-auto px-2">{children}</div>
+      </DialogContent>
+    </Dialog>
   )
 }

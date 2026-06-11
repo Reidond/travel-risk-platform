@@ -38,7 +38,9 @@
     "noData": "No data",
     "pagePrev": "Previous page",
     "pageNext": "Next page",
-    "pageRange": "{{from}}–{{to}} of {{total}}"
+    "pageRange": "{{from}}–{{to}} of {{total}}",
+    "deleting": "Deleting…",
+    "perPage": "Rows per page"
   },
   "terms": {
     "L": "low risk",
@@ -94,7 +96,6 @@
     "latestResult": "Latest evaluation",
     "noResult": "not evaluated yet",
     "select": "Select region “{{name}}”",
-    "noRegions": "No regions yet. Create a region or load the demo dataset.",
     "import": {
       "title": "Data import (Excel/CSV)",
       "file": "File (.xlsx or .csv)",
@@ -153,13 +154,13 @@
     "adjustCallout": "Not satisfied with the result? Adjust the platform parameters or the aggregation rules, then re-run the evaluation.",
     "adjustLink": "Go to parameters",
     "evalConflict": "Evaluation is not possible:",
-    "noRegions": "No regions yet. Create a region on the “Regions & data” page first."
+    "selectAll": "Select all regions",
+    "selectedCount": "Selected: {{n}}"
   },
   "dashboard": {
     "title": "Dashboard",
     "runSelect": "Evaluation run",
     "runOption": "Run #{{id}} — {{date}}",
-    "noRuns": "No evaluation runs yet. Run an evaluation from the DM panel.",
     "comparisonTitle": "Region comparison",
     "muChartTitle": "μ_R by region",
     "legendTitle": "Risk class scale",
@@ -240,6 +241,37 @@
       "structuralChange": "The criteria composition has changed (groups, criteria, or codes). If questionnaires already exist, the server will reject the save with a 409 error — delete the questionnaires first.",
       "saved": "Criteria saved."
     }
+  },
+  "emptyStates": {
+    "regionsTitle": "No regions yet",
+    "regionsHint": "Create your first region or load the demo dataset to explore the platform.",
+    "panelTitle": "Nothing to evaluate yet",
+    "panelHint": "Create regions and add questionnaires on the “Regions & data” page first.",
+    "panelCta": "Go to regions & data",
+    "dashboardTitle": "No evaluation runs yet",
+    "dashboardHint": "Run an evaluation from the DM panel to see the comparison, charts, and exports.",
+    "dashboardCta": "Go to the DM panel"
+  },
+  "confirm": {
+    "deleteRegionTitle": "Delete region",
+    "deleteRespondentTitle": "Delete questionnaire",
+    "removeGroupTitle": "Delete criteria group",
+    "removeGroupBody": "Group “{{name}}” and its criteria will be removed from the editor. If questionnaires already exist, the server will reject the save with a 409 error.",
+    "runAllTitle": "Evaluate all regions",
+    "runAllBody": "Every region will be included in this evaluation run.",
+    "resetRulesTitle": "Restore the article's rules",
+    "resetRulesBody": "A new ruleset version with the article's default rules will be created and activated."
+  },
+  "toast": {
+    "regionCreated": "Region created.",
+    "regionSaved": "Region saved.",
+    "regionDeleted": "Region deleted.",
+    "respondentCreated": "Questionnaire added.",
+    "respondentSaved": "Questionnaire saved.",
+    "respondentDeleted": "Questionnaire deleted.",
+    "panelRowSaved": "Region parameters saved.",
+    "rulesReset": "The article's rules have been restored.",
+    "evaluated": "Evaluation run #{{id}} finished."
   },
   "validation": {
     "required": "This field is required.",

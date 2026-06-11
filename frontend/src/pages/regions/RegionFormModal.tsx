@@ -1,7 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { regionsApi } from '../../api/regions'
 import { DELTA_LEVELS, type DeltaLevel, type Region, type RegionCreate } from '../../api/types'
 import { ErrorNote } from '../../components/Feedback'
@@ -11,6 +22,9 @@ interface RegionFormModalProps {
   region?: Region
   onClose: () => void
 }
+
+/** Radix SelectItem values must not be ''; sentinel for the "not set" option. */
+const DELTA_NONE = 'none'
 
 export function RegionFormModal({ region, onClose }: RegionFormModalProps) {
   const { t } = useTranslation()
@@ -25,6 +39,7 @@ export function RegionFormModal({ region, onClose }: RegionFormModalProps) {
     mutationFn: (body: RegionCreate) =>
       region ? regionsApi.update(region.id, body) : regionsApi.create(body),
     onSuccess: () => {
+      toast.success(region ? t('toast.regionSaved') : t('toast.regionCreated'))
       void queryClient.invalidateQueries({ queryKey: ['regions'] })
       onClose()
     },
@@ -56,10 +71,10 @@ export function RegionFormModal({ region, onClose }: RegionFormModalProps) {
 
   return (
     <Modal title={region ? t('regions.editRegion') : t('regions.createRegion')} onClose={onClose}>
-      <form onSubmit={submit} noValidate>
-        <div className="form-field">
-          <label htmlFor="region-name-uk">{t('regions.nameUk')}</label>
-          <input
+      <form onSubmit={submit} noValidate className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="region-name-uk">{t('regions.nameUk')}</Label>
+          <Input
             id="region-name-uk"
             type="text"
             value={nameUk}
@@ -67,9 +82,9 @@ export function RegionFormModal({ region, onClose }: RegionFormModalProps) {
             required
           />
         </div>
-        <div className="form-field">
-          <label htmlFor="region-name-en">{t('regions.nameEn')}</label>
-          <input
+        <div className="grid gap-1.5">
+          <Label htmlFor="region-name-en">{t('regions.nameEn')}</Label>
+          <Input
             id="region-name-en"
             type="text"
             value={nameEn}
@@ -77,9 +92,9 @@ export function RegionFormModal({ region, onClose }: RegionFormModalProps) {
             required
           />
         </div>
-        <div className="form-field">
-          <label htmlFor="region-xi">{t('values.xi')}</label>
-          <input
+        <div className="grid gap-1.5">
+          <Label htmlFor="region-xi">{t('values.xi')}</Label>
+          <Input
             id="region-xi"
             type="number"
             min={0}
@@ -89,34 +104,38 @@ export function RegionFormModal({ region, onClose }: RegionFormModalProps) {
             onChange={(e) => setXi(e.target.value)}
           />
         </div>
-        <div className="form-field">
-          <label htmlFor="region-delta">{t('values.deltaLevel')}</label>
-          <select
-            id="region-delta"
-            value={delta}
-            onChange={(e) => setDelta(e.target.value as DeltaLevel | '')}
+        <div className="grid gap-1.5">
+          <Label htmlFor="region-delta">{t('values.deltaLevel')}</Label>
+          <Select
+            value={delta === '' ? DELTA_NONE : delta}
+            onValueChange={(value) => setDelta(value === DELTA_NONE ? '' : (value as DeltaLevel))}
           >
-            <option value="">{t('common.notSet')}</option>
-            {DELTA_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {t(`deltaLevels.${level}`)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="region-delta" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={DELTA_NONE}>{t('common.notSet')}</SelectItem>
+              {DELTA_LEVELS.map((level) => (
+                <SelectItem key={level} value={level}>
+                  {t(`deltaLevels.${level}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {formError !== null && (
-          <p className="form-error" role="alert">
+          <p className="text-destructive text-sm" role="alert">
             {formError}
           </p>
         )}
         {mutation.isError && <ErrorNote error={mutation.error} />}
-        <div className="form-actions">
-          <button type="button" className="btn" onClick={onClose}>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
             {t('common.cancel')}
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
+          </Button>
+          <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? t('common.saving') : t('common.save')}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

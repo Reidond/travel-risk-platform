@@ -85,7 +85,9 @@ def main() -> None:
                         # run an evaluation so the per-module step-cards are visible
                         page.get_by_role("button").filter(
                             has_text="всі регіони" if lang == "uk" else "all regions"
-                        ).click()
+                        ).first.click()
+                        # "Run all" opens a confirmation dialog; confirm it
+                        page.get_by_role("alertdialog").get_by_role("button").last.click()
                         page.wait_for_selector(".step-card", timeout=30_000)
                         page.wait_for_load_state("networkidle")
                     page.wait_for_timeout(1200)  # let charts animate in

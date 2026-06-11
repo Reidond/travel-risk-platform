@@ -1,19 +1,35 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { TriangleAlertIcon, XIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { criteriaApi } from '../../api/criteria'
 import type { CriteriaConfig, CriteriaGroupInput } from '../../api/types'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ErrorNote, Loading } from '../../components/Feedback'
+import { localizedName, useLang } from '../../lib/lang'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function CriteriaSection() {
   const { t } = useTranslation()
   const criteriaQuery = useQuery({ queryKey: ['criteria'], queryFn: criteriaApi.get })
 
   return (
-    <section className="panel-card" aria-labelledby="criteria-title">
-      <h2 id="criteria-title">{t('parameters.criteria.title')}</h2>
-      <p className="alert alert-info">{t('parameters.criteria.warning')}</p>
+    <section
+      className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+      aria-labelledby="criteria-title"
+    >
+      <h2 id="criteria-title" className="text-lg font-semibold mb-3">
+        {t('parameters.criteria.title')}
+      </h2>
+      <Alert variant="warning" role="status" className="mb-4">
+        <TriangleAlertIcon aria-hidden="true" />
+        <AlertDescription>{t('parameters.criteria.warning')}</AlertDescription>
+      </Alert>
       {criteriaQuery.isPending && <Loading />}
       {criteriaQuery.isError && <ErrorNote error={criteriaQuery.error} />}
       {criteriaQuery.isSuccess && (
@@ -53,15 +69,16 @@ function structureOf(groups: { code: string; criteria: { code: string }[] }[]): 
 
 function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
   const { t } = useTranslation()
+  const lang = useLang()
   const queryClient = useQueryClient()
   const [groups, setGroups] = useState<CriteriaGroupInput[]>(() => cloneGroups(initial))
-  const [saved, setSaved] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [removeGroupIndex, setRemoveGroupIndex] = useState<number | null>(null)
 
   const mutation = useMutation({
     mutationFn: criteriaApi.put,
     onSuccess: () => {
-      setSaved(true)
+      toast.success(t('parameters.criteria.saved'))
       void queryClient.invalidateQueries({ queryKey: ['criteria'] })
     },
   })
@@ -154,9 +171,14 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
     setGroups((prev) => prev.filter((_, i) => i !== groupIndex))
   }
 
+  const pendingRemoveGroup = removeGroupIndex !== null ? groups[removeGroupIndex] : undefined
+  const pendingRemoveName =
+    pendingRemoveGroup !== undefined
+      ? localizedName(pendingRemoveGroup, lang).trim() || pendingRemoveGroup.code
+      : ''
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    setSaved(false)
     const hasBlank = groups.some(
       (group) =>
         group.code.trim() === '' ||
@@ -181,14 +203,14 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
     <form onSubmit={submit} noValidate>
       {groups.map((group, groupIndex) => (
         // Index keys: codes are editable, so they cannot key the rows.
-        <fieldset key={groupIndex} className="criteria-group">
-          <legend>{group.code || '…'}</legend>
-          <div className="form-row">
-            <div className="form-field">
-              <label htmlFor={`group-${groupIndex}-code`}>
+        <fieldset key={groupIndex} className="rounded-lg border px-4 py-3 mb-4">
+          <legend className="px-1.5 text-sm font-semibold">{group.code || '…'}</legend>
+          <div className="flex flex-wrap gap-4">
+            <div className="grid gap-1.5 w-28">
+              <Label htmlFor={`group-${groupIndex}-code`}>
                 {t('parameters.criteria.groupCode')}
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`group-${groupIndex}-code`}
                 type="text"
                 maxLength={16}
@@ -196,22 +218,22 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
                 onChange={(e) => updateGroup(groupIndex, 'code', e.target.value)}
               />
             </div>
-            <div className="form-field">
-              <label htmlFor={`group-${groupIndex}-uk`}>
+            <div className="grid gap-1.5 flex-1 min-w-40">
+              <Label htmlFor={`group-${groupIndex}-uk`}>
                 {t('parameters.criteria.groupNameUk')}
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`group-${groupIndex}-uk`}
                 type="text"
                 value={group.name_uk}
                 onChange={(e) => updateGroup(groupIndex, 'name_uk', e.target.value)}
               />
             </div>
-            <div className="form-field">
-              <label htmlFor={`group-${groupIndex}-en`}>
+            <div className="grid gap-1.5 flex-1 min-w-40">
+              <Label htmlFor={`group-${groupIndex}-en`}>
                 {t('parameters.criteria.groupNameEn')}
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`group-${groupIndex}-en`}
                 type="text"
                 value={group.name_en}
@@ -220,12 +242,12 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
             </div>
           </div>
           {group.criteria.map((criterion, criterionIndex) => (
-            <div key={criterionIndex} className="criterion-edit-row">
-              <div className="form-field">
-                <label htmlFor={`criterion-${groupIndex}-${criterionIndex}-code`}>
+            <div key={criterionIndex} className="mt-3 flex flex-wrap items-end gap-3">
+              <div className="grid gap-1.5 w-28">
+                <Label htmlFor={`criterion-${groupIndex}-${criterionIndex}-code`}>
                   {t('parameters.criteria.code')}
-                </label>
-                <input
+                </Label>
+                <Input
                   id={`criterion-${groupIndex}-${criterionIndex}-code`}
                   type="text"
                   maxLength={16}
@@ -235,11 +257,11 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
                   }
                 />
               </div>
-              <div className="form-field">
-                <label htmlFor={`criterion-${groupIndex}-${criterionIndex}-uk`}>
+              <div className="grid gap-1.5 flex-1 min-w-40">
+                <Label htmlFor={`criterion-${groupIndex}-${criterionIndex}-uk`}>
                   {t('parameters.criteria.textUk')}
-                </label>
-                <input
+                </Label>
+                <Input
                   id={`criterion-${groupIndex}-${criterionIndex}-uk`}
                   type="text"
                   value={criterion.text_uk}
@@ -248,11 +270,11 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
                   }
                 />
               </div>
-              <div className="form-field">
-                <label htmlFor={`criterion-${groupIndex}-${criterionIndex}-en`}>
+              <div className="grid gap-1.5 flex-1 min-w-40">
+                <Label htmlFor={`criterion-${groupIndex}-${criterionIndex}-en`}>
                   {t('parameters.criteria.textEn')}
-                </label>
-                <input
+                </Label>
+                <Input
                   id={`criterion-${groupIndex}-${criterionIndex}-en`}
                   type="text"
                   value={criterion.text_en}
@@ -261,61 +283,83 @@ function CriteriaForm({ initial }: { initial: CriteriaConfig }) {
                   }
                 />
               </div>
-              <button
+              <Button
                 type="button"
-                className="btn btn-icon"
+                variant="ghost"
+                size="icon-sm"
                 disabled={group.criteria.length <= 1}
                 aria-label={t('parameters.criteria.removeCriterion', { code: criterion.code })}
                 onClick={() => removeCriterion(groupIndex, criterionIndex)}
               >
-                ✕
-              </button>
+                <XIcon aria-hidden="true" />
+              </Button>
             </div>
           ))}
-          <div className="form-actions form-actions-start">
-            <button type="button" className="btn btn-small" onClick={() => addCriterion(groupIndex)}>
-              {t('parameters.criteria.addCriterion')}
-            </button>
-            <button
+          <div className="mt-4 flex justify-start gap-2">
+            <Button
               type="button"
-              className="btn btn-small btn-danger"
+              variant="outline"
+              size="sm"
+              onClick={() => addCriterion(groupIndex)}
+            >
+              {t('parameters.criteria.addCriterion')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline-destructive"
+              size="sm"
               disabled={groups.length <= 1}
-              onClick={() => removeGroup(groupIndex)}
+              onClick={() => setRemoveGroupIndex(groupIndex)}
             >
               {t('parameters.criteria.removeGroup')}
-            </button>
+            </Button>
           </div>
         </fieldset>
       ))}
 
-      <div className="form-actions form-actions-start">
-        <button type="button" className="btn" onClick={addGroup}>
+      <div className="mt-4 flex justify-start gap-2">
+        <Button type="button" variant="outline" onClick={addGroup}>
           {t('parameters.criteria.addGroup')}
-        </button>
+        </Button>
       </div>
 
       {structureChanged && (
-        <p className="alert alert-info" role="alert">
-          {t('parameters.criteria.structuralChange')}
-        </p>
+        <Alert variant="warning" role="alert" className="mt-4">
+          <TriangleAlertIcon aria-hidden="true" />
+          <AlertDescription>{t('parameters.criteria.structuralChange')}</AlertDescription>
+        </Alert>
       )}
       {formError !== null && (
-        <p className="form-error" role="alert">
+        <p className="text-destructive text-sm mt-3" role="alert">
           {formError}
         </p>
       )}
-      {mutation.isError && <ErrorNote error={mutation.error} />}
-      {saved && (
-        <p className="alert alert-success" role="status">
-          {t('parameters.criteria.saved')}
-        </p>
+      {mutation.isError && (
+        <div className="mt-3">
+          <ErrorNote error={mutation.error} />
+        </div>
       )}
 
-      <div className="form-actions form-actions-start">
-        <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
+      <div className="mt-4 flex justify-start gap-2">
+        <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? t('common.saving') : t('common.save')}
-        </button>
+        </Button>
       </div>
+
+      <ConfirmDialog
+        open={removeGroupIndex !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveGroupIndex(null)
+        }}
+        title={t('confirm.removeGroupTitle')}
+        description={t('confirm.removeGroupBody', { name: pendingRemoveName })}
+        confirmLabel={t('common.delete')}
+        destructive
+        onConfirm={() => {
+          if (removeGroupIndex !== null) removeGroup(removeGroupIndex)
+          setRemoveGroupIndex(null)
+        }}
+      />
     </form>
   )
 }

@@ -1,7 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { respondentsApi } from '../../api/respondents'
 import type { CriteriaConfig, Ratings, Respondent, RespondentCreate } from '../../api/types'
 import { ErrorNote } from '../../components/Feedback'
@@ -16,6 +21,15 @@ interface RespondentFormModalProps {
 }
 
 const RATING_VALUES = [1, 2, 3, 4, 5] as const
+
+/** Static lookup so the i18n keys stay greppable (no string-built keys). */
+const SCALE_LABEL_KEYS = {
+  1: 'scale.l1',
+  2: 'scale.l2',
+  3: 'scale.l3',
+  4: 'scale.l4',
+  5: 'scale.l5',
+} as const
 
 function initialRatings(criteria: CriteriaConfig, respondent?: Respondent): Ratings {
   const ratings: Ratings = {}
@@ -48,6 +62,7 @@ export function RespondentFormModal({
     mutationFn: (body: RespondentCreate) =>
       respondent ? respondentsApi.update(respondent.id, body) : respondentsApi.create(regionId, body),
     onSuccess: () => {
+      toast.success(respondent ? t('toast.respondentSaved') : t('toast.respondentCreated'))
       void queryClient.invalidateQueries({ queryKey: ['respondents'] })
       void queryClient.invalidateQueries({ queryKey: ['regions'] })
       onClose()
@@ -77,39 +92,39 @@ export function RespondentFormModal({
       wide
     >
       <form onSubmit={submit} noValidate>
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="resp-ext-id">{t('regions.respondentsTable.extId')}</label>
-            <input
+        <div className="mb-4 flex flex-wrap gap-4">
+          <div className="grid flex-1 gap-1.5 min-w-40">
+            <Label htmlFor="resp-ext-id">{t('regions.respondentsTable.extId')}</Label>
+            <Input
               id="resp-ext-id"
               type="text"
               value={extId}
               onChange={(e) => setExtId(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="resp-year">{t('regions.respondentsTable.year')}</label>
-            <input
+          <div className="grid flex-1 gap-1.5 min-w-40">
+            <Label htmlFor="resp-year">{t('regions.respondentsTable.year')}</Label>
+            <Input
               id="resp-year"
               type="text"
               value={year}
               onChange={(e) => setYear(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="resp-month">{t('regions.respondentsTable.month')}</label>
-            <input
+          <div className="grid flex-1 gap-1.5 min-w-40">
+            <Label htmlFor="resp-month">{t('regions.respondentsTable.month')}</Label>
+            <Input
               id="resp-month"
               type="text"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="resp-accommodation">
+          <div className="grid flex-1 gap-1.5 min-w-40">
+            <Label htmlFor="resp-accommodation">
               {t('regions.respondentsTable.accommodation')}
-            </label>
-            <input
+            </Label>
+            <Input
               id="resp-accommodation"
               type="text"
               value={accommodation}
@@ -117,52 +132,71 @@ export function RespondentFormModal({
             />
           </div>
         </div>
+        <p className="text-muted-foreground mb-4 text-sm">
+          {RATING_VALUES.map((value) => `${value} = ${t(SCALE_LABEL_KEYS[value])}`).join(' · ')}
+        </p>
         {criteria.groups.map((group) => (
-          <fieldset key={group.code} className="criteria-group">
-            <legend>
+          <fieldset key={group.code} className="rounded-lg border px-4 py-3 mb-4">
+            <legend className="px-1.5 text-sm font-semibold">
               {group.code} — {localizedName(group, lang)}
             </legend>
-            {group.criteria.map((criterion) => {
-              const inputId = `rating-${criterion.code}`
-              return (
-                <div key={criterion.code} className="form-field criterion-field">
-                  <label htmlFor={inputId}>
-                    {criterion.code}. {lang === 'en' ? criterion.text_en : criterion.text_uk}
-                  </label>
-                  <select
-                    id={inputId}
-                    value={ratings[criterion.code] ?? 3}
-                    onChange={(e) =>
-                      setRatings((prev) => ({
-                        ...prev,
-                        [criterion.code]: Number(e.target.value),
-                      }))
-                    }
+            <div className="grid gap-2.5">
+              {group.criteria.map((criterion) => {
+                const labelId = `rating-label-${criterion.code}`
+                return (
+                  <div
+                    key={criterion.code}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5"
                   >
-                    {RATING_VALUES.map((value) => (
-                      <option key={value} value={value}>
-                        {value} — {t(`scale.l${value}`)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )
-            })}
+                    <span id={labelId} className="flex-1 text-sm min-w-56">
+                      {criterion.code}. {lang === 'en' ? criterion.text_en : criterion.text_uk}
+                    </span>
+                    <RadioGroup
+                      className="flex gap-1"
+                      aria-labelledby={labelId}
+                      value={String(ratings[criterion.code] ?? 3)}
+                      onValueChange={(value) =>
+                        setRatings((prev) => ({
+                          ...prev,
+                          [criterion.code]: Number(value),
+                        }))
+                      }
+                    >
+                      {RATING_VALUES.map((value) => {
+                        const itemId = `rating-${criterion.code}-${value}`
+                        return (
+                          <span key={value} className="flex items-center gap-1">
+                            <RadioGroupItem
+                              id={itemId}
+                              value={String(value)}
+                              aria-label={t(SCALE_LABEL_KEYS[value])}
+                            />
+                            <Label htmlFor={itemId} className="font-normal">
+                              {value}
+                            </Label>
+                          </span>
+                        )
+                      })}
+                    </RadioGroup>
+                  </div>
+                )
+              })}
+            </div>
           </fieldset>
         ))}
         {formError !== null && (
-          <p className="form-error" role="alert">
+          <p className="text-destructive text-sm" role="alert">
             {formError}
           </p>
         )}
         {mutation.isError && <ErrorNote error={mutation.error} />}
-        <div className="form-actions">
-          <button type="button" className="btn" onClick={onClose}>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
             {t('common.cancel')}
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
+          </Button>
+          <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? t('common.saving') : t('common.save')}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

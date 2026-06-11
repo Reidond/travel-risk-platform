@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowDownIcon, ArrowUpIcon, XIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { criteriaApi } from '../../api/criteria'
 import { rulesetsApi } from '../../api/rulesets'
@@ -10,7 +12,18 @@ import {
   type Rule,
   type RuleSetVersion,
 } from '../../api/types'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ErrorNote, Loading } from '../../components/Feedback'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const MAX_RULES = 10
 const TERM_LEVELS = [1, 2, 3, 4, 5] as const
@@ -22,9 +35,14 @@ export function RulesSection() {
   const groupCount = criteriaQuery.data?.groups.length ?? 3
 
   return (
-    <section className="panel-card" aria-labelledby="rules-title">
-      <h2 id="rules-title">{t('parameters.rules.title')}</h2>
-      <p className="muted">{t('parameters.rules.intro')}</p>
+    <section
+      className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+      aria-labelledby="rules-title"
+    >
+      <h2 id="rules-title" className="text-lg font-semibold mb-3">
+        {t('parameters.rules.title')}
+      </h2>
+      <p className="text-muted-foreground text-sm mb-4">{t('parameters.rules.intro')}</p>
       {activeQuery.isPending && <Loading />}
       {activeQuery.isError && <ErrorNote error={activeQuery.error} />}
       {activeQuery.isSuccess && (
@@ -47,7 +65,7 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
   const [defaultOutput, setDefaultOutput] = useState<RiskTerm>(initial.default_output)
   const [comment, setComment] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
-  const [savedVersion, setSavedVersion] = useState<number | null>(null)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['ruleset'] })
@@ -57,14 +75,18 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
   const saveMutation = useMutation({
     mutationFn: rulesetsApi.create,
     onSuccess: (data) => {
-      setSavedVersion(data.version)
+      toast.success(t('parameters.rules.saved', { version: data.version }))
       invalidate()
     },
   })
 
   const resetMutation = useMutation({
     mutationFn: rulesetsApi.resetDefault,
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setResetConfirmOpen(false)
+      toast.success(t('toast.rulesReset'))
+      invalidate()
+    },
   })
 
   const updateRule = (index: number, updater: (rule: Rule) => Rule) => {
@@ -109,7 +131,6 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
       return
     }
     setFormError(null)
-    setSavedVersion(null)
     saveMutation.mutate({
       rules,
       default_output: defaultOutput,
@@ -119,24 +140,29 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
 
   return (
     <form onSubmit={submit} noValidate>
-      <ol className="rule-list">
+      {/* list-none strips list semantics in VoiceOver — restore them explicitly */}
+      <ol className="list-none space-y-3" role="list">
         {rules.map((rule, index) => (
-          <li key={index} className="rule-row">
-            <div className="rule-row-head">
+          <li key={index} role="listitem" className="rounded-lg border bg-muted/40 px-4 py-3">
+            <div className="flex flex-wrap items-baseline gap-3">
               <strong>{t('parameters.rules.rule', { index: index + 1 })}</strong>
-              <span className="rule-sentence">{ruleSentence(rule)}</span>
+              <span className="text-muted-foreground text-sm">{ruleSentence(rule)}</span>
             </div>
-            <div className="rule-row-controls">
-              <div className="rule-slots">
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {rule.pattern.map((level, slotIndex) => {
                   const id = `rule-${index}-slot-${slotIndex}`
                   return (
-                    <span key={id} className="rule-slot">
-                      <label className="visually-hidden" htmlFor={id}>
+                    <span
+                      key={id}
+                      className="bg-card inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5"
+                    >
+                      <label className="sr-only" htmlFor={id}>
                         {t('parameters.rules.slotLevel', { index: slotIndex + 1 })}
                       </label>
                       <select
                         id={id}
+                        className="border-none bg-transparent text-sm py-0.5 pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                         value={level}
                         onChange={(e) =>
                           updateRule(index, (current) => ({
@@ -153,9 +179,10 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
                           </option>
                         ))}
                       </select>
-                      <button
+                      <Button
                         type="button"
-                        className="btn btn-icon"
+                        variant="ghost"
+                        size="icon-xs"
                         disabled={rule.pattern.length <= 1}
                         aria-label={t('parameters.rules.removeSlot', { index: slotIndex + 1 })}
                         onClick={() =>
@@ -165,14 +192,15 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
                           }))
                         }
                       >
-                        ✕
-                      </button>
+                        <XIcon aria-hidden="true" />
+                      </Button>
                     </span>
                   )
                 })}
-                <button
+                <Button
                   type="button"
-                  className="btn btn-small"
+                  variant="outline"
+                  size="sm"
                   disabled={rule.pattern.length >= groupCount}
                   onClick={() =>
                     updateRule(index, (current) => ({
@@ -182,92 +210,103 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
                   }
                 >
                   {t('parameters.rules.addSlot')}
-                </button>
+                </Button>
               </div>
-              <div className="form-field input-inline">
-                <label htmlFor={`rule-${index}-output`}>
+              <div className="grid gap-1.5">
+                <Label htmlFor={`rule-${index}-output`}>
                   {t('parameters.rules.output', { index: index + 1 })}
-                </label>
-                <select
-                  id={`rule-${index}-output`}
+                </Label>
+                <Select
                   value={rule.output}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     updateRule(index, (current) => ({
                       ...current,
-                      output: e.target.value as RiskTerm,
+                      output: value as RiskTerm,
                     }))
                   }
                 >
-                  {RISK_TERMS.map((term) => (
-                    <option key={term} value={term}>
-                      {term} — {t(`terms.${term}`)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id={`rule-${index}-output`} size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RISK_TERMS.map((term) => (
+                      <SelectItem key={term} value={term}>
+                        {term} — {t(`terms.${term}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="row-actions">
-                <button
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
                   type="button"
-                  className="btn btn-icon"
+                  variant="ghost"
+                  size="icon-sm"
                   disabled={index === 0}
                   aria-label={t('common.moveUp')}
                   onClick={() => moveRule(index, -1)}
                 >
-                  ↑
-                </button>
-                <button
+                  <ArrowUpIcon aria-hidden="true" />
+                </Button>
+                <Button
                   type="button"
-                  className="btn btn-icon"
+                  variant="ghost"
+                  size="icon-sm"
                   disabled={index === rules.length - 1}
                   aria-label={t('common.moveDown')}
                   onClick={() => moveRule(index, 1)}
                 >
-                  ↓
-                </button>
-                <button
+                  <ArrowDownIcon aria-hidden="true" />
+                </Button>
+                <Button
                   type="button"
-                  className="btn btn-small btn-danger"
+                  variant="outline-destructive"
+                  size="sm"
                   disabled={rules.length <= 1}
                   aria-label={t('parameters.rules.removeRule', { index: index + 1 })}
                   onClick={() => setRules((prev) => prev.filter((_, i) => i !== index))}
                 >
                   {t('common.delete')}
-                </button>
+                </Button>
               </div>
             </div>
           </li>
         ))}
       </ol>
 
-      <div className="form-actions form-actions-start">
-        <button
+      <div className="mt-4 flex justify-start gap-2">
+        <Button
           type="button"
-          className="btn"
+          variant="outline"
           disabled={rules.length >= MAX_RULES}
           onClick={() => setRules((prev) => [...prev, { pattern: [3], output: 'H' }])}
         >
           {t('parameters.rules.addRule')}
-        </button>
+        </Button>
       </div>
 
-      <div className="form-row">
-        <div className="form-field">
-          <label htmlFor="default-output">{t('parameters.rules.defaultOutput')}</label>
-          <select
-            id="default-output"
+      <div className="mt-4 flex flex-wrap gap-4">
+        <div className="grid gap-1.5 flex-1 min-w-40">
+          <Label htmlFor="default-output">{t('parameters.rules.defaultOutput')}</Label>
+          <Select
             value={defaultOutput}
-            onChange={(e) => setDefaultOutput(e.target.value as RiskTerm)}
+            onValueChange={(value) => setDefaultOutput(value as RiskTerm)}
           >
-            {RISK_TERMS.map((term) => (
-              <option key={term} value={term}>
-                {term} — {t(`terms.${term}`)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="default-output" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RISK_TERMS.map((term) => (
+                <SelectItem key={term} value={term}>
+                  {term} — {t(`terms.${term}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="form-field">
-          <label htmlFor="ruleset-comment">{t('common.comment')}</label>
-          <input
+        <div className="grid gap-1.5 flex-1 min-w-40">
+          <Label htmlFor="ruleset-comment">{t('common.comment')}</Label>
+          <Input
             id="ruleset-comment"
             type="text"
             value={comment}
@@ -277,31 +316,45 @@ function RuleBuilder({ initial, groupCount }: { initial: RuleSetVersion; groupCo
       </div>
 
       {formError !== null && (
-        <p className="form-error" role="alert">
+        <p className="text-destructive text-sm mt-3" role="alert">
           {formError}
         </p>
       )}
-      {saveMutation.isError && <ErrorNote error={saveMutation.error} />}
-      {resetMutation.isError && <ErrorNote error={resetMutation.error} />}
-      {savedVersion !== null && (
-        <p className="alert alert-success" role="status">
-          {t('parameters.rules.saved', { version: savedVersion })}
-        </p>
+      {saveMutation.isError && (
+        <div className="mt-3">
+          <ErrorNote error={saveMutation.error} />
+        </div>
+      )}
+      {resetMutation.isError && (
+        <div className="mt-3">
+          <ErrorNote error={resetMutation.error} />
+        </div>
       )}
 
-      <div className="form-actions form-actions-start">
-        <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
+      <div className="mt-4 flex justify-start gap-2">
+        <Button type="submit" disabled={saveMutation.isPending}>
           {saveMutation.isPending ? t('common.saving') : t('common.save')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="btn"
+          variant="outline"
           disabled={resetMutation.isPending}
-          onClick={() => resetMutation.mutate()}
+          onClick={() => setResetConfirmOpen(true)}
         >
           {t('parameters.rules.reset')}
-        </button>
+        </Button>
       </div>
+
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        title={t('confirm.resetRulesTitle')}
+        description={t('confirm.resetRulesBody')}
+        confirmLabel={t('parameters.rules.reset')}
+        pendingLabel={t('common.saving')}
+        onConfirm={() => resetMutation.mutate()}
+        isPending={resetMutation.isPending}
+      />
     </form>
   )
 }

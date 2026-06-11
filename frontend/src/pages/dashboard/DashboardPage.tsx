@@ -1,6 +1,27 @@
 import { skipToken, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router'
+
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { configApi } from '../../api/config'
 import { evaluationsApi } from '../../api/evaluations'
@@ -11,7 +32,8 @@ import {
   type EvaluationRun,
 } from '../../api/types'
 import { RiskClassBadge } from '../../components/Badges'
-import { ErrorNote, Loading } from '../../components/Feedback'
+import { EmptyState } from '../../components/EmptyState'
+import { ErrorNote, LoadingSkeleton } from '../../components/Feedback'
 import { RISK_CLASS_COLORS } from '../../lib/colors'
 import { DELTA_SHORT, fmt, formatDateTime } from '../../lib/format'
 import { useLang, localizedName } from '../../lib/lang'
@@ -45,50 +67,75 @@ export function DashboardPage() {
   })
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <h1>{t('dashboard.title')}</h1>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold tracking-tight">{t('dashboard.title')}</h1>
         {runId !== null && (
-          <div className="row-actions">
-            <a className="btn" href={evaluationsApi.exportUrl(runId, 'xlsx', lang)} download>
-              {t('dashboard.exportXlsx')}
-            </a>
-            <a className="btn" href={evaluationsApi.exportUrl(runId, 'pdf', lang)} download>
-              {t('dashboard.exportPdf')}
-            </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="run-select">{t('dashboard.runSelect')}</Label>
+            <Select
+              value={String(runId)}
+              onValueChange={(value) => setSelectedRunId(Number(value))}
+            >
+              <SelectTrigger id="run-select" className="min-w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {runs.map((run) => (
+                  <SelectItem key={run.id} value={String(run.id)}>
+                    {t('dashboard.runOption', {
+                      id: run.id,
+                      date: formatDateTime(run.created_at, lang),
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button asChild variant="outline">
+              <a href={evaluationsApi.exportUrl(runId, 'xlsx', lang)} download>
+                {t('dashboard.exportXlsx')}
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={evaluationsApi.exportUrl(runId, 'pdf', lang)} download>
+                {t('dashboard.exportPdf')}
+              </a>
+            </Button>
           </div>
         )}
       </div>
 
-      {runsQuery.isPending && <Loading />}
+      {runsQuery.isPending && <LoadingSkeleton rows={4} />}
       {runsQuery.isError && <ErrorNote error={runsQuery.error} />}
       {runsQuery.isSuccess && runs.length === 0 && (
-        <p className="muted">{t('dashboard.noRuns')}</p>
+        <EmptyState
+          title={t('emptyStates.dashboardTitle')}
+          hint={t('emptyStates.dashboardHint')}
+        >
+          <Button asChild>
+            <Link to="/panel">{t('emptyStates.dashboardCta')}</Link>
+          </Button>
+        </EmptyState>
       )}
 
-      {runs.length > 0 && (
-        <div className="form-field input-inline">
-          <label htmlFor="run-select">{t('dashboard.runSelect')}</label>
-          <select
-            id="run-select"
-            value={runId ?? ''}
-            onChange={(e) => setSelectedRunId(Number(e.target.value))}
-          >
-            {runs.map((run) => (
-              <option key={run.id} value={run.id}>
-                {t('dashboard.runOption', {
-                  id: run.id,
-                  date: formatDateTime(run.created_at, lang),
-                })}
-              </option>
-            ))}
-          </select>
-        </div>
+      {runId !== null && runQuery.isPending && (
+        <>
+          <div className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm">
+            <LoadingSkeleton rows={5} />
+          </div>
+          <div className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm">
+            <LoadingSkeleton rows={8} />
+          </div>
+        </>
       )}
-
-      {runId !== null && runQuery.isPending && <Loading />}
       {runQuery.isError && <ErrorNote error={runQuery.error} />}
-      {runQuery.isSuccess && <RunView run={runQuery.data} curvesError={curvesQuery.error} curves={curvesQuery.data ?? null} />}
+      {runQuery.isSuccess && (
+        <RunView
+          run={runQuery.data}
+          curvesError={curvesQuery.error}
+          curves={curvesQuery.data ?? null}
+        />
+      )}
     </div>
   )
 }
@@ -107,56 +154,99 @@ function RunView({
 
   return (
     <>
-      <section className="panel-card" aria-labelledby="comparison-title">
-        <h2 id="comparison-title">{t('dashboard.comparisonTitle')}</h2>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col">{t('dashboard.region')}</th>
-                <th scope="col">{t('values.n')}</th>
-                <th scope="col">{t('values.xi')}</th>
-                <th scope="col">{t('values.deltaLevel')}</th>
-                <th scope="col">{t('values.delta')}</th>
-                <th scope="col">{t('values.phi')}</th>
-                <th scope="col">{t('values.mS')}</th>
-                <th scope="col">{t('values.omega')}</th>
-                <th scope="col">{t('values.mu')}</th>
-                <th scope="col">{t('values.riskClass')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {run.results.map((result) => (
-                <tr key={result.region.id}>
-                  <th scope="row">{localizedName(result.region, lang)}</th>
-                  <td>{result.n}</td>
-                  <td>{fmt(result.xi, 2)}</td>
-                  <td title={t(`deltaLevels.${result.delta_level}`)}>
-                    {DELTA_SHORT[result.delta_level]}
-                  </td>
-                  <td>{fmt(result.delta, 2)}</td>
-                  <td>{fmt(result.phi, 4)}</td>
-                  <td>{fmt(result.m_s, 4)}</td>
-                  <td>{fmt(result.omega, 2)}</td>
-                  <td>{fmt(result.mu, 4)}</td>
-                  <td>
-                    <RiskClassBadge riskClass={result.risk_class} compact />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <section
+        className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+        aria-labelledby="comparison-title"
+      >
+        <h2 id="comparison-title" className="text-lg font-semibold mb-3">
+          {t('dashboard.comparisonTitle')}
+        </h2>
+        <Table>
+          <TableCaption className="sr-only">{t('dashboard.comparisonTitle')}</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">{t('dashboard.region')}</TableHead>
+              <TableHead scope="col" className="text-right">
+                {t('values.n')}
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                {t('values.xi')}
+              </TableHead>
+              <TableHead scope="col">{t('values.deltaLevel')}</TableHead>
+              <TableHead scope="col" className="border-l text-right">
+                {t('values.delta')}
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                {t('values.phi')}
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                {t('values.mS')}
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                {t('values.omega')}
+              </TableHead>
+              <TableHead scope="col" className="border-l text-right">
+                {t('values.mu')}
+              </TableHead>
+              <TableHead scope="col">{t('values.riskClass')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {run.results.map((result) => (
+              <TableRow key={result.region.id}>
+                <th
+                  scope="row"
+                  className="p-2 text-left align-middle font-medium whitespace-nowrap"
+                >
+                  {localizedName(result.region, lang)}
+                </th>
+                <TableCell className="text-right tabular-nums">{result.n}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(result.xi, 2)}</TableCell>
+                <TableCell>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0} title={t(`deltaLevels.${result.delta_level}`)}>
+                        {DELTA_SHORT[result.delta_level]}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{t(`deltaLevels.${result.delta_level}`)}</TooltipContent>
+                  </Tooltip>
+                </TableCell>
+                <TableCell className="border-l text-right tabular-nums">
+                  {fmt(result.delta, 2)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(result.phi, 4)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(result.m_s, 4)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(result.omega, 2)}</TableCell>
+                <TableCell className="border-l text-right tabular-nums">
+                  {fmt(result.mu, 4)}
+                </TableCell>
+                <TableCell>
+                  <RiskClassBadge riskClass={result.risk_class} compact />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </section>
 
-      <section className="panel-card" aria-labelledby="mu-chart-title">
-        <h2 id="mu-chart-title">{t('dashboard.muChartTitle')}</h2>
+      <section
+        className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+        aria-labelledby="mu-chart-title"
+      >
+        <h2 id="mu-chart-title" className="text-lg font-semibold mb-3">
+          {t('dashboard.muChartTitle')}
+        </h2>
         <MuBarChart results={run.results} />
-        <div className="risk-legend" role="list" aria-label={t('dashboard.legendTitle')}>
+        <div
+          className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-sm"
+          role="list"
+          aria-label={t('dashboard.legendTitle')}
+        >
           {RISK_CLASSES.map((riskClass) => (
-            <span key={riskClass} className="risk-legend-item" role="listitem">
+            <span key={riskClass} className="inline-flex items-center gap-1.5" role="listitem">
               <span
-                className="risk-legend-swatch"
+                className="size-3.5 rounded-sm inline-block"
                 style={{ backgroundColor: RISK_CLASS_COLORS[riskClass] }}
                 aria-hidden="true"
               />
@@ -166,18 +256,28 @@ function RunView({
         </div>
       </section>
 
-      <section className="panel-card" aria-labelledby="distribution-title">
-        <h2 id="distribution-title">{t('dashboard.distributionTitle')}</h2>
+      <section
+        className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+        aria-labelledby="distribution-title"
+      >
+        <h2 id="distribution-title" className="text-lg font-semibold mb-3">
+          {t('dashboard.distributionTitle')}
+        </h2>
         <DistributionChart results={run.results} />
       </section>
 
-      <section className="panel-card" aria-labelledby="curves-title">
-        <h2 id="curves-title">{t('dashboard.curvesTitle')}</h2>
+      <section
+        className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+        aria-labelledby="curves-title"
+      >
+        <h2 id="curves-title" className="text-lg font-semibold mb-3">
+          {t('dashboard.curvesTitle')}
+        </h2>
         {curvesError != null && <ErrorNote error={curvesError} />}
         {curves && (
-          <div className="charts-row">
+          <div className="grid gap-5 grid-cols-[repeat(auto-fit,minmax(20rem,1fr))]">
             <div>
-              <h3>{t('dashboard.zSplineTitle')}</h3>
+              <h3 className="text-sm font-semibold mb-2">{t('dashboard.zSplineTitle')}</h3>
               <CurveChart
                 curve={curves.z_spline}
                 xLabel="δ"
@@ -191,7 +291,7 @@ function RunView({
               />
             </div>
             <div>
-              <h3>{t('dashboard.sShapeTitle')}</h3>
+              <h3 className="text-sm font-semibold mb-2">{t('dashboard.sShapeTitle')}</h3>
               <CurveChart
                 curve={curves.s_shape}
                 xLabel="ω"
@@ -205,7 +305,7 @@ function RunView({
               />
             </div>
             <div>
-              <h3>{t('dashboard.coneTitle')}</h3>
+              <h3 className="text-sm font-semibold mb-2">{t('dashboard.coneTitle')}</h3>
               {/* Eq. 4.7 sections: m_S(φ) at Ξ=1 and m_S(Ξ) at φ=1. Region
                   markers are omitted on purpose — each region's m_S is
                   computed with its own Ξ ≠ 1, so the points (φ, m_S) do not
@@ -225,14 +325,17 @@ function RunView({
 
       <IndividualsSection run={run} />
 
-      <section className="panel-card" aria-labelledby="dist-terms-title">
-        <h2 id="dist-terms-title">{t('dashboard.legendTitle')}</h2>
-        <ul className="distribution-list">
+      <section
+        className="bg-card text-card-foreground rounded-xl border p-5 shadow-sm"
+        aria-labelledby="dist-terms-title"
+      >
+        <h2 id="dist-terms-title" className="text-lg font-semibold mb-3">
+          {t('dashboard.legendTitle')}
+        </h2>
+        <ul className="list-none space-y-1.5">
           {RISK_TERMS.map((term) => (
-            <li key={term}>
-              <span className="muted">
-                {term} — {t(`terms.${term}`)}: χ = {run.config_snapshot.chi_scale[term]}
-              </span>
+            <li key={term} className="text-muted-foreground text-sm">
+              {term} — {t(`terms.${term}`)}: χ = {run.config_snapshot.chi_scale[term]}
             </li>
           ))}
         </ul>
