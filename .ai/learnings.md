@@ -85,3 +85,39 @@ Accumulated project-level knowledge discovered during task implementation, bug f
 - **Finding**: A PEP-723 Playwright script boots the real stack (throwaway SQLite), seeds the demo dataset, runs an evaluation (so the DM-panel step-cards are populated), and captures all 4 pages × 2 languages into `docs/screenshots/`.
 - **Impact**: After any UI change, regenerate figures with `uv run scripts/make_screenshots.py` (one-time: `uv run --with playwright playwright install chromium`) instead of manual screenshots.
 - **Category**: pattern
+
+### [2026-06-11] shadcn CLI 4.x init is interactive-only — hand-write components.json instead
+- **Context**: shadcn/ui + Tailwind v4 migration; `npx shadcn@latest init --base-color slate` failed (flag removed in CLI 4.x; base color is an interactive prompt and gray/slate are no longer offered).
+- **Finding**: Writing `components.json` manually (style new-york, baseColor neutral, cssVariables, tailwind.config "") plus installing cva/clsx/tailwind-merge/lucide-react/tw-animate-css makes `npx shadcn add <components>` work deterministically with no prompts. Two post-add sweeps were needed: generated `sonner.tsx` imports `next-themes` (strip + hardcode theme="light"), and `src/components/ui/**` needs a scoped eslint override for `react-refresh/only-export-components`. Hardcoded sr-only strings in generated files (Dialog "Close") must be routed through t().
+- **Impact**: For future `shadcn add` runs the setup is already in place; audit any newly generated ui/ file for next-themes imports, /50-opacity focus rings, and untranslated sr-only text before use.
+- **Category**: external-api
+
+### [2026-06-11] TS 6 deprecates baseUrl (TS5101); paths must be duplicated across both tsconfigs
+- **Context**: Adding the @/* alias for shadcn; `tsc -b` failed with TS5101 "Option 'baseUrl' is deprecated".
+- **Finding**: Relative `paths` entries (`"@/*": ["./src/*"]`) work without `baseUrl` in TS 6. They must exist in BOTH `tsconfig.json` (read by the shadcn CLI; harmless since files:[]) and `tsconfig.app.json` (used by tsc -b — project references do not inherit compilerOptions).
+- **Impact**: Never add `baseUrl`; when adding aliases, update both tsconfig files and `vite.config.ts` resolve.alias together.
+- **Category**: pitfall
+
+### [2026-06-11] Radix Select crashes at runtime on empty-string item values
+- **Context**: Converting native `<select>` "not set"/"all"/"auto-detect" options (value="") to Radix Select.
+- **Finding**: `SelectItem value=""` throws at render time — a runtime error invisible to tsc. Sentinel values ('none'/'all'/'auto') mapped back to null/'' at the state/API boundary are required. Dense in-table selects stayed native to avoid sentinel churn (PanelPage Δ cells, RulesSection pills).
+- **Impact**: Any new Radix Select with an optional/empty choice needs a sentinel; grep for `value=""` near SelectItem in reviews.
+- **Category**: pitfall
+
+### [2026-06-11] make_screenshots.py is coupled to UI flow semantics, not just selectors
+- **Context**: UX-2 put "Run all regions" behind a ConfirmDialog; the screenshot script clicks that button by text and waits for `.step-card`.
+- **Finding**: The script needed a second click (`get_by_role("alertdialog").get_by_role("button").last`) to confirm; it also depends on the literal `step-card` class kept on PanelPage step sections. Both are invisible couplings that only fail at thesis-figure regeneration time.
+- **Impact**: Changing PanelPage's evaluation flow, step-card markup, or run-button labels requires updating `scripts/make_screenshots.py` in the same change (rule added to AGENTS.md).
+- **Category**: pitfall
+
+### [2026-06-11] Workflow subagents can report completion before their writes land — verify with git, recover from transcripts
+- **Context**: 4-track page-conversion workflow "completed" with detailed per-track summaries, but `git status` showed zero page files modified; writes then flushed progressively over the next minutes, one track never wrote at all, and reviewer agents raced the flush (their findings mixed real issues with fabrications — the "blocker" was already fixed in the code, while two real issues were correct).
+- **Finding**: Subagent structured output is a claim, not evidence. `git status --short` after a write-fanout is the ground truth; agent transcripts (`agent-*.jsonl`) contain full Write payloads, so un-flushed files can be recovered without re-running. A re-run agent should be told to verify its own writes via git before returning.
+- **Impact**: After any multi-agent write workflow: (1) diff-verify the working tree against each agent's filesChanged claim, (2) treat reviewer findings as hypotheses to re-verify in the current code, (3) bake "confirm via git status before returning" into writer-agent prompts.
+- **Category**: pattern
+
+### [2026-06-11] Pre-provision all i18n keys before fanning out parallel page agents
+- **Context**: 4 parallel agents converting disjoint page files, all needing new uk/en strings (toasts, confirms, empty states).
+- **Finding**: Adding every anticipated key to both locale files up front and forbidding agents from touching `src/i18n/*` eliminated the only shared-file conflict; agents report missing keys in structured output instead. A flatten-and-diff node one-liner verifies parity (CI-able). Unused provisioned keys (one of ~30) are cheap to delete afterwards.
+- **Impact**: For any parallel frontend fan-out: centralize shared-file edits (i18n, index.css, ui/) in the orchestrator before launching; give agents disjoint file ownership lists.
+- **Category**: pattern

@@ -17,6 +17,14 @@
 
 ## 2026-06-11
 
+### [RULE-ADDED] Two "Do not" rules from the shadcn/ui migration
+- **Category:** Quality
+- **Hypothesis:** By naming the two invisible couplings the migration actually hit (screenshot script ↔ PanelPage flow; locale files ↔ parallel subagent fan-outs), we expect future UI changes and multi-agent workflows to avoid silent thesis-figure breakage and i18n merge conflicts because both failure modes now have an explicit pre-flight check in the binding rules instead of living only in transcripts.
+- **Signal:** Next PanelPage or evaluation-flow change includes a make_screenshots.py update (or an explicit "not needed" note) in the same diff; next parallel frontend workflow provisions i18n keys in the orchestrator with zero locale-file conflicts.
+- **Risk:** Rule list growth dilutes attention if entries accumulate without consolidation; the learning-consolidator should merge UI-coupling rules if more appear.
+- **Status:** PENDING
+- **Changelog ref:** 2026-06-11 — Two "Do not" rules from the shadcn/ui migration
+
 ### [CONV-ADDED] Project conventions established after full platform implementation
 - **Category:** Consistency
 - **Hypothesis:** By binding future tasks to the implemented architecture's invariants (spec-wins conflict resolution via MATH_SPEC.md/API_CONTRACT.md, math-stays-in-core, i18n key parity), we expect future changes to land without cross-component drift because both sides of every boundary now have a named, checkable source of truth instead of implicit knowledge from this session.

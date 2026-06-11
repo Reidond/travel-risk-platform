@@ -12,6 +12,12 @@
 
 ## 2026-06-11
 
+### RULE-ADDED: Two "Do not" rules from the shadcn/ui migration
+- **What:** Added to AGENTS.md "Do not": (1) never change PanelPage's evaluation flow, `step-card` markup, or run-button labels without updating `scripts/make_screenshots.py` in the same change (the script clicks "Run all", confirms the AlertDialog, and waits for `.step-card`); (2) never edit `frontend/src/i18n/*.json` from parallel subagents — pre-provision keys in the orchestrator and keep agent file ownership disjoint
+- **Why:** The migration empirically hit both: putting Run-all behind a ConfirmDialog silently broke thesis-figure regeneration until the script was patched, and the parallel 4-track page conversion only avoided locale-file conflicts because keys were provisioned up front
+- **Files:** `AGENTS.md`, `.ai/learnings.md`, `scripts/make_screenshots.py`
+- **Affected workflows:** Any multi-agent frontend workflow; thesis-figure regeneration
+
 ### CONV-ADDED: Project conventions established after full platform implementation
 - **What:** Replaced the AGENTS.md "Conventions" placeholder with the real project conventions: uv-workspace monorepo layout (zero-dep `core/` library, workspace-dep `backend/`, `frontend/`), source-of-truth pointers (`MATH_SPEC.md` for computational semantics, `API_CONTRACT.md` for the HTTP boundary), math-stays-in-core principle, test commands and must-pass control-value tests, i18n key-parity requirement, Docker deployment notes, and the screenshot-regeneration command
 - **Why:** The Software Development Plan was fully implemented this session; conventions discovered/decided during the build (spec-wins conflicts, single math source, root build context for Docker) must bind future tasks before they drift

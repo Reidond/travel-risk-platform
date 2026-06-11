@@ -19,6 +19,8 @@ Project conventions and AI development workflows for travel-risk-platform.
 - Add runtime dependencies to `core/` (it ships to PyPI as a zero-dependency library)
 - Invert the survey ratings on import — the dataset is positively coded (higher K = safer; see `.ai/learnings.md`)
 - Remove the import/export/evaluation resource caps or the xlsx-cell sanitization in `backend/` (demo-deployment hardening)
+- Change PanelPage's evaluation flow, its `step-card` markup, or the run-button labels without updating `scripts/make_screenshots.py` in the same change (it clicks "Run all", confirms the AlertDialog, and waits for `.step-card`)
+- Edit `frontend/src/i18n/*.json` from parallel subagents — pre-provision keys in the orchestrator and keep agent file ownership disjoint
 
 ## AI Development Workflows
 
