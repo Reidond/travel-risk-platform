@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the article below."
+type: software
+title: "tourism-risk: Intelligent analytical platform for tourism travel safety risk assessment"
+authors:
+  - family-names: Shafar
+    given-names: Andrii
+    affiliation: Uzhhorod National University
+version: 0.1.0
+date-released: "2026-06-10"
+license: MIT
+repository-code: "https://github.com/Reidond/travel-risk-platform"
+keywords:
+  - tourism
+  - risk assessment
+  - fuzzy logic
+  - decision support
+preferred-citation:
+  type: article
+  title: "Intellectual-analytical platform for assessing the security risk of tourist travel"
+  authors:
+    # "Andriy" is the article's published transliteration of the author's
+    # name (the software author uses "Andrii") — keep as published.
+    - family-names: Shafar
+      given-names: Andriy
+      affiliation: Uzhhorod National University
+  journal: "Scientific Journal of Ternopil National Technical University"
+  year: 2025
+  volume: 120
+  issue: "4"
+  start: 78
+  end: 89
+  doi: 10.33108/visnyk_tntu2025.04.078

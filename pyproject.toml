@@ -1,0 +1,8 @@
+[tool.uv.workspace]
+members = ["core", "backend"]
+
+# Editor-environment dependencies for repo-level scripts (scripts/*.py declare
+# their own deps via PEP 723 for `uv run`; this group makes them resolvable by
+# the IDE language server, which uses the root .venv).
+[dependency-groups]
+dev = ["playwright>=1.50"]

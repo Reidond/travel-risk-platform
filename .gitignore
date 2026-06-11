@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Build artifacts — `uv build --project core` resolves --out-dir relative to
+# the cwd, so running it from the repo root writes wheels/sdists here.
+# Pass `--out-dir core/dist` in CI/publish scripts to keep artifacts with the
+# package.
+dist/
+
+# Local SQLite data — the README quickstart creates ./data/app.db
+# (mirrors .dockerignore).
+data/
+*.db
