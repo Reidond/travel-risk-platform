@@ -13,7 +13,13 @@ The platform is a software implementation of the operator **T₅(R, E, Ξ, Δ, M
 
 ## 2. System Requirements and Startup
 
-### 2.1. Running with Docker (recommended)
+### 2.1. Public demo (no installation)
+
+A public demonstration instance is available at **<https://travel-risk-platform.andrii-shafar.workers.dev>**.
+
+> **Note on data persistence:** the demo database is ephemeral — it resets after the instance has been idle for ~30 minutes, after every new deployment, and during host maintenance. If the data disappears, simply click **"Load demo dataset"** on the **Regions & data** page again. For persistent data, run the platform yourself with Docker (section 2.2).
+
+### 2.2. Running with Docker (recommended for persistent data)
 
 Requires Docker with Compose. From the repository root run:
 
@@ -27,7 +33,7 @@ Open **http://localhost:8080** in a browser. The SQLite database persists in the
 docker compose down -v
 ```
 
-### 2.2. Running in development mode
+### 2.3. Running in development mode
 
 Requires [uv](https://docs.astral.sh/uv/) (manages Python itself) and Node.js ≥ 20. In two terminals from the repository root:
 
@@ -41,7 +47,7 @@ cd frontend && npm install && npm run dev
 
 Open **http://localhost:5173**.
 
-### 2.3. First steps
+### 2.4. First steps
 
 1. On the **Regions & data** page click **"Load demo dataset"** — this imports the demonstration set of 327 questionnaires across three oblasts (Zakarpattia, Ivano-Frankivsk, Lviv) with Ξ and Δ values already set.
 2. Go to the **DM panel** and click **"Evaluate all regions"**.
