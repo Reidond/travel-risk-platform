@@ -1,0 +1,85 @@
+# Production deploy to Cloudflare: the Worker serves frontend/dist as static
+# assets and routes /api/* to the backend container (see cloudflare/).
+#
+# Every deploy re-runs the full CI gate first (reusable workflow), then
+# `wrangler deploy` builds the backend Docker image on the runner, pushes it
+# to Cloudflare's registry, and uploads the Worker + assets.
+#
+# Required repository secrets (NOT environment-scoped):
+#   CLOUDFLARE_API_TOKEN  — needs Workers Scripts:Edit + Containers:Edit
+#   CLOUDFLARE_ACCOUNT_ID
+# Optional repository variable:
+#   WORKERS_DEV_HOST — e.g. travel-risk-platform.<subdomain>.workers.dev;
+#   when set, the post-deploy smoke test warms the container and verifies
+#   /api/health actually serves traffic.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    # Docs-only pushes don't change the artifact, and every container rollout
+    # wipes the demo's ephemeral SQLite — don't redeploy for them.
+    paths-ignore:
+      - "docs/**"
+      - ".specs/**"
+      - ".ai/**"
+      - "**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize deploys and never cancel one mid-flight — an interrupted wrangler
+# deploy cannot roll itself back. (Under rapid pushes the latest pending run
+# replaces older pending ones; production still converges on the newest tree.)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  deploy:
+    name: wrangler deploy
+    needs: ci
+    # workflow_dispatch lets an operator pick any branch — only main may
+    # reach production.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      # The exact bundle CI built and validated (uploaded by the ci job above)
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: cloudflare/package-lock.json
+      - run: npm ci
+        working-directory: cloudflare
+      # npx resolves the lockfile-pinned wrangler from node_modules, so the
+      # deploy tool version is reproducible.
+      - run: npx wrangler deploy
+        working-directory: cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # First deploys provision the container asynchronously (/api 503s for a
+      # few minutes) and every deploy cold-boots uvicorn — retry until the API
+      # answers so a broken image can't go green silently. ~5 min budget.
+      - name: Smoke test /api/health
+        if: vars.WORKERS_DEV_HOST != ''
+        env:
+          HOST: ${{ vars.WORKERS_DEV_HOST }}
+        run: >
+          curl -sfm 30 --retry 20 --retry-delay 15 --retry-all-errors
+          "https://$HOST/api/health"

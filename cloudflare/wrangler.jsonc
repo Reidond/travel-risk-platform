@@ -1,0 +1,42 @@
+// Cloudflare deployment: one Worker serves the built frontend as static
+// assets and routes /api/* to the FastAPI backend running as a Cloudflare
+// Container (built from backend/Dockerfile with the REPO ROOT as build
+// context — the backend is a uv workspace member that needs core/).
+//
+// Requires the Workers Paid plan (Containers). Container disk is ephemeral:
+// the SQLite database resets when the instance sleeps (see sleepAfter in
+// src/worker.ts), on redeploy, and on host maintenance — acceptable for the
+// demo deployment, not for durable data.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "travel-risk-platform",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "../frontend/dist",
+    "binding": "ASSETS",
+    // SPA: unknown paths fall back to index.html with 200
+    "not_found_handling": "single-page-application",
+    // The Worker runs ONLY for these routes; all other traffic is served
+    // straight from the asset edge cache without a Worker invocation.
+    "run_worker_first": ["/api/*"]
+  },
+  "containers": [
+    {
+      "class_name": "Backend",
+      // Paths resolve relative to this config file's directory.
+      "image": "../backend/Dockerfile",
+      "image_build_context": "..",
+      // 1/4 vCPU, 1 GiB RAM, 4 GB disk — "lite" (256 MiB) is too small for
+      // FastAPI + openpyxl/reportlab workloads.
+      "instance_type": "basic",
+      // Single-writer SQLite: never fan out to more than one instance.
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "BACKEND", "class_name": "Backend" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Backend"] }],
+  "observability": { "enabled": true }
+}

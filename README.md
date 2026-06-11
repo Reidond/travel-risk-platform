@@ -68,7 +68,13 @@ cd frontend && npm install && npm run dev
 
 ## Deployment
 
-The compose stack runs unchanged on any Docker host — e.g. Render, Railway,
+**Cloudflare (CI/CD):** every push to `main` runs the CI gate and deploys via
+`wrangler` — one Worker serves the SPA as static assets and routes `/api/*` to
+the backend running as a Cloudflare Container. Setup (secrets, plan
+requirements) and the ephemeral-SQLite caveat are documented in
+[`cloudflare/README.md`](cloudflare/README.md).
+
+**Any Docker host:** the compose stack runs unchanged on e.g. Render, Railway,
 Fly.io, or a plain VPS: build the two images from `docker-compose.yml`, expose
 the `web` service, and mount a persistent volume at `/app/data` on the API
 container so the SQLite database survives restarts (compose already declares
@@ -78,11 +84,17 @@ Public demo: _URL to be added once deployed._
 
 ## Tests & quality gates
 
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these checks
+as parallel jobs on every PR and again before every deploy:
+
 ```sh
-uv run --project core pytest core/tests -q        # core: 175 tests
-uv run --project backend pytest backend/tests -q  # backend: API + control-value tests
-uvx ruff check core backend                       # lint (Python)
-cd frontend && npm run build && npm run lint      # tsc + vite build, eslint
+uv run --project core pytest core/tests -q          # core: 175 tests (py3.12 + 3.13 in CI)
+uv run --project backend pytest backend/tests -q    # backend: API + control-value tests
+uv run --project core ruff check core backend       # lint (Python)
+uv run --project core ruff format --check core backend
+cd frontend && npm run build && npm run lint        # tsc + vite build, eslint
+node scripts/check_i18n_keys.mjs                    # uk/en i18n key parity
+cd cloudflare && npm run typecheck && npm run validate  # Worker types + wrangler config
 ```
 
 Verification anchors (see `.specs/plan-implementation/dataset-verification.md`):

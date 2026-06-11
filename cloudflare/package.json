@@ -1,0 +1,18 @@
+{
+  "name": "cloudflare-deploy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "wrangler types && tsc --noEmit",
+    "validate": "wrangler deploy --dry-run --outdir dist-validate --containers-rollout none"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "wrangler": "^4.98.0"
+  }
+}

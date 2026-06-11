@@ -1,6 +1,9 @@
 # Context for backend/Dockerfile is the repo root — keep it small.
+# (Used by docker-compose and by `wrangler deploy` from cloudflare/.)
 .git
-.venv
+**/.venv
+**/node_modules
+cloudflare
 **/__pycache__
 **/*.pyc
 .pytest_cache
