@@ -15,6 +15,24 @@
 
 ---
 
+## 2026-06-11
+
+### [CONV-ADDED] Project conventions established after full platform implementation
+- **Category:** Consistency
+- **Hypothesis:** By binding future tasks to the implemented architecture's invariants (spec-wins conflict resolution via MATH_SPEC.md/API_CONTRACT.md, math-stays-in-core, i18n key parity), we expect future changes to land without cross-component drift because both sides of every boundary now have a named, checkable source of truth instead of implicit knowledge from this session.
+- **Signal:** In the next tasks touching backend+frontend or core math, no review findings about contract drift, duplicated formulas, or uneven uk/en keys; agents cite the spec files when resolving ambiguity.
+- **Risk:** The contract/spec files may silently fall behind if a future change edits code first and skips the spec-update step, making the convention misleading rather than protective.
+- **Status:** PENDING
+- **Changelog ref:** 2026-06-11 — CONV-ADDED: Project conventions established after full platform implementation
+
+### [RULE-ADDED] Three "Do not" rules from implementation findings
+- **Category:** Quality
+- **Hypothesis:** By prohibiting the three empirically-demonstrated failure modes (core runtime deps, rating inversion, removal of upload caps/cell sanitization), we expect zero regressions on these axes because each rule encodes a mistake that was actually reproduced during the build rather than a speculative concern.
+- **Signal:** Future diffs never add a runtime dependency to core/pyproject.toml, never transform ratings on import, and keep the importer/exporter guards; no security-review repeat findings on formula injection or unbounded uploads.
+- **Risk:** None anticipated.
+- **Status:** PENDING
+- **Changelog ref:** 2026-06-11 — RULE-ADDED: Three "Do not" rules from implementation findings
+
 ## 2026-06-10
 
 ### [SKILL-ADDED] python-best-practices reference skill

@@ -10,6 +10,20 @@
 
 ---
 
+## 2026-06-11
+
+### CONV-ADDED: Project conventions established after full platform implementation
+- **What:** Replaced the AGENTS.md "Conventions" placeholder with the real project conventions: uv-workspace monorepo layout (zero-dep `core/` library, workspace-dep `backend/`, `frontend/`), source-of-truth pointers (`MATH_SPEC.md` for computational semantics, `API_CONTRACT.md` for the HTTP boundary), math-stays-in-core principle, test commands and must-pass control-value tests, i18n key-parity requirement, Docker deployment notes, and the screenshot-regeneration command
+- **Why:** The Software Development Plan was fully implemented this session; conventions discovered/decided during the build (spec-wins conflicts, single math source, root build context for Docker) must bind future tasks before they drift
+- **Files:** `AGENTS.md`, `.ai/learnings.md`
+- **Affected workflows:** spec-driven-dev, post-task-review (both now inherit concrete conventions to check against)
+
+### RULE-ADDED: Three "Do not" rules from implementation findings
+- **What:** Added to AGENTS.md "Do not": (1) no runtime dependencies in `core/` (PyPI zero-dep library), (2) never invert survey ratings on import (dataset is positively coded), (3) never remove the backend's import/export/evaluation resource caps or xlsx-cell sanitization (security hardening from the review panel)
+- **Why:** Each guards against a mistake that was either actually made or empirically demonstrated during the build (formula-injection PoC, coding-direction analysis, library-independence requirement from the supervisor agreements)
+- **Files:** `AGENTS.md`
+- **Affected workflows:** None
+
 ## 2026-06-10
 
 ### SKILL-ADDED: python-best-practices reference skill
