@@ -1,6 +1,6 @@
 [project]
 name = "tourism-risk"
-version = "0.1.0"
+version = "0.2.0"
 description = "Computational core for tourism travel safety risk assessment (fuzzy multi-level model M_I -> M_R1 -> M_R2 -> M_R3)"
 readme = "README.md"
 license = "MIT"
