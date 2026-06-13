@@ -1,8 +1,12 @@
 # Quality gates. Runs on every pull request, and is reused as the pre-deploy
 # gate by deploy.yml (workflow_call). One job per tool so checks parallelize.
 #
-# NOTE: when called from deploy.yml, the `github` context is the caller's
-# (event_name == "push") — do not key anything on github.workflow here.
+# NOTE: when called via workflow_call, the `github` context is the caller's
+# (event_name == "push", workflow == "Deploy"/"Publish to PyPI") — keep that
+# in mind before keying anything else on it. github.workflow is deliberately
+# part of the concurrency group: deploy.yml and publish-pypi.yml both call
+# this workflow on every push to main, and without it one caller's CI would
+# queue behind (or cancel) the other's.
 name: CI
 
 on:
@@ -14,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

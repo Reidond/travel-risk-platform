@@ -1,0 +1,129 @@
+# Publish the core library (tourism-risk) to PyPI — two channels:
+#
+#   stable  — push a tag core-v<version> matching core/pyproject.toml, e.g.
+#               git tag core-v0.1.0 && git push origin core-v0.1.0
+#             Publishes that exact version and a GitHub Release on the tag.
+#
+#   preview — every push to main. The version is derived, never committed:
+#             next patch after pyproject + .dev<commit count on main>, e.g.
+#             0.1.0 -> 0.1.1.dev18. PyPI rejects local version segments
+#             (PEP 440 `+gabc1234`), so the commit SHA lives in the tag and
+#             GitHub prerelease name instead: core-dev-v0.1.1.dev18-abc1234.
+#             pip/uv skip dev releases unless asked (pip install --pre /
+#             uv add --prerelease allow), so stable consumers never see them.
+#
+# The preview tag prefix is core-dev-v (NOT core-v) so it can never trigger
+# the stable path; tags created with GITHUB_TOKEN don't retrigger workflows
+# anyway, but don't rely on that alone.
+#
+# Auth is PyPI Trusted Publishing (OIDC) — no API token secret. PyPI is
+# configured with a publisher for this repo (owner Reidond, repository
+# travel-risk-platform, workflow publish-pypi.yml, environment pypi):
+# https://pypi.org/manage/account/publishing/
+name: Publish to PyPI
+
+on:
+  push:
+    tags: ["core-v*"]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Serialize publishes; never cancel mid-upload (PyPI uploads are immutable —
+# a half-published release can't be retried under the same version).
+concurrency:
+  group: publish-pypi
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: build + uv publish + release
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/tourism-risk/
+    permissions:
+      contents: write # create the preview tag + GitHub Releases
+      id-token: write # OIDC token for PyPI Trusted Publishing
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # preview versions count commits on main
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Resolve version and channel
+        id: ver
+        env:
+          REF: ${{ github.ref }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          base="$(uv version --project core --short)"
+          if [[ ! "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "core/pyproject.toml version '$base' is not a plain X.Y.Z stable version" >&2
+            exit 1
+          fi
+          if [[ "$REF" == refs/tags/core-v* ]]; then
+            # Stable: the tag must match pyproject so a stale tag can't ship
+            # the wrong artifact.
+            if [ "$TAG" != "core-v$base" ]; then
+              echo "Tag $TAG does not match core/pyproject.toml version $base" >&2
+              exit 1
+            fi
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+            echo "version=$base" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          else
+            # Preview: next patch + .dev<commit count> sorts after the last
+            # stable release and below the next one, and the commit count is
+            # monotonic on main so every push gets a fresh, ordered version.
+            IFS=. read -r maj min pat <<<"$base"
+            version="${maj}.${min}.$((pat + 1)).dev$(git rev-list --count HEAD)"
+            sha="$(git rev-parse --short HEAD)"
+            # --frozen: version change is build-input only, never re-locks
+            # the workspace and never gets committed
+            uv version --project core --frozen "$version"
+            echo "channel=preview" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo "tag=core-dev-v$version-$sha" >> "$GITHUB_OUTPUT"
+          fi
+      - run: uv build --package tourism-risk -o dist
+      # The wheel must install and import in an environment that has nothing
+      # but the wheel itself (core ships with zero runtime deps).
+      - name: Smoke test wheel in a clean environment
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import tourism_risk"
+      # --check-url makes re-runs idempotent: files already on PyPI are
+      # skipped instead of failing the upload.
+      - run: uv publish --check-url https://pypi.org/simple/ dist/*
+      - name: Create GitHub Release (stable)
+        if: steps.ver.outputs.channel == 'stable'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: >
+          gh release create "$TAG" dist/* --verify-tag
+          --title "tourism-risk $VERSION"
+          --generate-notes
+      - name: Create GitHub Release (preview)
+        if: steps.ver.outputs.channel == 'preview'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        # gh creates the tag at --target since it doesn't exist yet
+        run: >
+          gh release create "$TAG" dist/* --prerelease
+          --target "$GITHUB_SHA"
+          --title "tourism-risk $VERSION (${GITHUB_SHA:0:7})"
+          --generate-notes
