@@ -36,9 +36,19 @@ concurrency:
   group: publish-pypi
   cancel-in-progress: false
 
+# A stable release pushes BOTH a release(core): commit to main and the
+# core-v* tag. The tag push must publish (stable); the commit push must NOT
+# (it would publish a redundant preview ahead of the stable just cut). The
+# guard below — on both jobs — always runs for core-v* tags but skips the
+# release commit on a main push. It is deterministic: no dependency on
+# tag/push ordering or on tags being visible to the runner. (Kept identical
+# on both jobs so they skip together; `publish` needs `ci` anyway.)
 jobs:
   ci:
     name: CI
+    if: >-
+      ${{ startsWith(github.ref, 'refs/tags/core-v') ||
+          !startsWith(github.event.head_commit.message, 'release(core): ') }}
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
@@ -46,6 +56,9 @@ jobs:
   publish:
     name: build + uv publish + release
     needs: ci
+    if: >-
+      ${{ startsWith(github.ref, 'refs/tags/core-v') ||
+          !startsWith(github.event.head_commit.message, 'release(core): ') }}
     runs-on: ubuntu-latest
     environment:
       name: pypi
